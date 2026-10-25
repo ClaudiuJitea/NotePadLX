@@ -21,6 +21,7 @@
 #include <QAbstractButton>
 #include <QComboBox>
 #include <QDir>
+#include <QTabBar>
 #include <QTemporaryDir>
 
 #include <cstdlib>
@@ -516,6 +517,47 @@ private slots:
 		view()->execute(SCI_GOTOPOS, 9); // just after '{' (the brace before the caret has priority)
 		_npp->command(IDM_SEARCH_GOTOMATCHINGBRACE);
 		QCOMPARE(view()->execute(SCI_GETCURRENTPOS), 10);
+	}
+
+	void tabsKeepTheLayout()
+	{
+		// upstream IDD_FIND_REPLACE_DLG: one dialog size for all the tabs, and the controls that several tabs show
+		// stay in their place when the tab changes
+		_npp->command(IDM_SEARCH_FIND);
+		QVERIFY(QTest::qWaitForWindowExposed(dlg()));
+		auto* tabs = dlg()->findChild<QTabBar*>();
+		QVERIFY(tabs);
+		const QList<int> shared = { IDFINDWHAT, IDWHOLEWORD, IDMATCHCASE, IDC_MODE_STATIC, IDCANCEL, IDC_TRANSPARENT_GRPBOX };
+		QSize size;
+		QMap<int, QRect> places;
+		const QString shots = qEnvironmentVariable("NPLX_FIND_SCREENSHOTS_DIR");
+		for (int index = 0; index < tabs->count(); ++index)
+		{
+			tabs->setCurrentIndex(index);
+			QCoreApplication::processEvents();
+			if (!shots.isEmpty())
+				dlg()->grab().save(QDir(shots).filePath(QStringLiteral("find-tab-%1.png").arg(index)));
+			if (index == 0)
+			{
+				size = dlg()->size();
+				for (int id : shared)
+					places[id] = dlg()->dlgItem(id)->geometry();
+				continue;
+			}
+			QCOMPARE(dlg()->size(), size);
+			for (int id : shared)
+				QVERIFY2(dlg()->dlgItem(id)->geometry() == places[id], qPrintable(QStringLiteral("control %1 moved in tab %2").arg(id).arg(index)));
+		}
+		// Replace with and the Find in Files fields share one column with Find what
+		tabs->setCurrentIndex(2);
+		QCoreApplication::processEvents();
+		for (int id : { IDREPLACEWITH, IDD_FINDINFILES_FILTERS_COMBO, IDD_FINDINFILES_DIR_COMBO })
+		{
+			QCOMPARE(dlg()->dlgItem(id)->x(), places[IDFINDWHAT].x());
+			QCOMPARE(dlg()->dlgItem(id)->width(), places[IDFINDWHAT].width());
+		}
+		tabs->setCurrentIndex(0);
+		dlg()->command(IDCANCEL);
 	}
 
 	void escapeClosesDialog()

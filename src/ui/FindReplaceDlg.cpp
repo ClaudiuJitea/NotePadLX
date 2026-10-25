@@ -2848,14 +2848,28 @@ void FindReplaceDlg::create()
 	body->setSpacing(10);
 	mainLayout->addLayout(body, 1);
 
-	// --- left: fields and options
+	// NPLX: upstream IDD_FIND_REPLACE_DLG is one fixed-size dialog for all the tabs: every control has its place and
+	// the controls of the other tabs are only hidden. In Qt layouts a hidden control gives its space away, so the
+	// places are kept here: a control that only some tabs show keeps its size when hidden (keepPlace), controls of
+	// different tabs share one grid cell (upstream: same position), and the dialog keeps the size of the largest tab
+	auto keepPlace = [](QWidget* w) {
+		QSizePolicy policy = w->sizePolicy();
+		policy.setRetainSizeWhenHidden(true);
+		w->setSizePolicy(policy);
+		return w;
+	};
+
+	// --- left: fields, options and search mode
 	auto* left = new QVBoxLayout;
 	left->setSpacing(4);
 	body->addLayout(left, 1);
 
+	// the rows have a fixed height and no spacing: a grid leaves out the spacing of a row whose controls are all
+	// hidden, even when they keep their place
 	auto* fields = new QGridLayout;
 	fields->setHorizontalSpacing(6);
-	fields->setVerticalSpacing(4);
+	fields->setVerticalSpacing(0);
+	fields->setColumnStretch(1, 1);
 	left->addLayout(fields);
 
 	auto makeLabel = [this](int id, const QString& text) {
@@ -2894,17 +2908,19 @@ void FindReplaceDlg::create()
 		return radio;
 	};
 
+	// row 0: Find what (all tabs)
 	auto* findWhatLabel = makeLabel(IDFINDWHAT_STATIC, QStringLiteral("&Find what:"));
 	QComboBox* findWhat = makeCombo(IDFINDWHAT);
 	findWhatLabel->setBuddy(findWhat);
 	fields->addWidget(findWhatLabel, 0, 0, Qt::AlignRight);
 	fields->addWidget(findWhat, 0, 1);
 
+	// row 1: Replace with (Replace, Find in Files, Find in Projects)
 	auto* replaceLabel = makeLabel(ID_STATICTEXT_REPLACE, QStringLiteral("Rep&lace with:"));
 	QComboBox* replaceWith = makeCombo(IDREPLACEWITH);
 	replaceLabel->setBuddy(replaceWith);
-	fields->addWidget(replaceLabel, 1, 0, Qt::AlignRight);
-	fields->addWidget(replaceWith, 1, 1);
+	fields->addWidget(keepPlace(replaceLabel), 1, 0, Qt::AlignRight);
+	fields->addWidget(keepPlace(replaceWith), 1, 1);
 
 	QPushButton* swapButton = makeButton(IDD_FINDREPLACE_SWAP_BUTTON, QStringLiteral("⇅"));
 	swapButton->setFixedWidth(32);
@@ -2918,17 +2934,20 @@ void FindReplaceDlg::create()
 		menu.addAction(QStringLiteral("⤴ Copy from Replace to Find"), this, [this]() { command(IDC_COPY_REPLACE2FIND); });
 		menu.exec(swapButton->mapToGlobal(pos));
 	});
-	fields->addWidget(swapButton, 0, 2, 2, 1);
+	fields->addWidget(keepPlace(swapButton), 0, 2, 2, 1, Qt::AlignVCenter);
 
+	// rows 2 and 3: Filters and Directory (Find in Files, Find in Projects), or Bookmark line and Purge (Mark), as
+	// upstream where they take the same place
 	auto* filtersLabel = makeLabel(IDD_FINDINFILES_FILTERS_STATIC, QStringLiteral("Filter&s:"));
 	QComboBox* filters = makeCombo(IDD_FINDINFILES_FILTERS_COMBO);
 	filtersLabel->setBuddy(filters);
 	auto* filterTip = makeLabel(IDC_FIF_FILTER_TIP_STATIC, QStringLiteral("(?)"));
+	filterTip->setAlignment(Qt::AlignCenter);
 	filterTip->setToolTip(QString::fromStdWString(pNativeSpeaker->getLocalizedStrFromID("find-in-files-filter-tip",
 		L"Find in cpp, cxx, h, hxx && hpp:\r*.cpp *.cxx *.h *.hxx *.hpp\r\rFind in all files except exe, obj && log:\r*.* !*.exe !*.obj !*.log\r\rFind in all files but exclude folders tests, bin && bin64:\r*.* !\\tests !\\bin*\r\rFind in all files but exclude all folders log or logs recursively:\r*.* !+\\log*")).replace(QLatin1Char('\r'), QLatin1Char('\n')).replace(QStringLiteral("&&"), QStringLiteral("&")));
-	fields->addWidget(filtersLabel, 2, 0, Qt::AlignRight);
-	fields->addWidget(filters, 2, 1);
-	fields->addWidget(filterTip, 2, 2);
+	fields->addWidget(keepPlace(filtersLabel), 2, 0, Qt::AlignRight);
+	fields->addWidget(keepPlace(filters), 2, 1);
+	fields->addWidget(keepPlace(filterTip), 2, 2);
 
 	auto* dirLabel = makeLabel(IDD_FINDINFILES_DIR_STATIC, QStringLiteral("Dir&ectory:"));
 	QComboBox* dirCombo = makeCombo(IDD_FINDINFILES_DIR_COMBO);
@@ -2940,31 +2959,27 @@ void FindReplaceDlg::create()
 	fromDoc->setToolTip(QString::fromStdWString(pNativeSpeaker->getLocalizedStrFromID("find-in-files-dir-from-active-doc-tip", L"Fill directory field based on active document")));
 	QPushButton* browse = makeButton(IDD_FINDINFILES_BROWSE_BUTTON, QStringLiteral("..."));
 	browse->setFixedWidth(32);
-	dirButtons->addWidget(fromDoc);
-	dirButtons->addWidget(browse);
-	fields->addWidget(dirLabel, 3, 0, Qt::AlignRight);
-	fields->addWidget(dirCombo, 3, 1);
+	dirButtons->addWidget(keepPlace(fromDoc));
+	dirButtons->addWidget(keepPlace(browse));
+	fields->addWidget(keepPlace(dirLabel), 3, 0, Qt::AlignRight);
+	fields->addWidget(keepPlace(dirCombo), 3, 1);
 	fields->addLayout(dirButtons, 3, 2);
 
-	auto* fifChecks = new QHBoxLayout;
-	fifChecks->addWidget(makeCheck(IDD_FINDINFILES_RECURSIVE_CHECK, QStringLiteral("In all su&b-folders")));
-	fifChecks->addWidget(makeCheck(IDD_FINDINFILES_INHIDDENDIR_CHECK, QStringLiteral("In &hidden folders")));
-	// upstream IDD_FINDINFILES_PROJECT*_CHECK (shown in the Find in Projects tab)
-	fifChecks->addWidget(makeCheck(IDD_FINDINFILES_PROJECT1_CHECK, QStringLiteral("Project Panel 1")));
-	fifChecks->addWidget(makeCheck(IDD_FINDINFILES_PROJECT2_CHECK, QStringLiteral("Project Panel 2")));
-	fifChecks->addWidget(makeCheck(IDD_FINDINFILES_PROJECT3_CHECK, QStringLiteral("Project Panel 3")));
-	fifChecks->addStretch(1);
-	fields->addLayout(fifChecks, 4, 1);
+	fields->addWidget(makeCheck(IDC_MARKLINE_CHECK, QStringLiteral("Book&mark line")), 2, 0, 1, 3, Qt::AlignVCenter);
+	fields->addWidget(makeCheck(IDC_PURGE_CHECK, QStringLiteral("Purge for each search")), 3, 0, 1, 3, Qt::AlignVCenter);
+	for (int row = 0; row <= 3; ++row)
+		fields->setRowMinimumHeight(row, findWhat->sizeHint().height() + 4);
 
+	// the search options (Backward direction and Wrap around are hidden in Find in Files: they keep their place)
 	auto* checks = new QVBoxLayout;
 	checks->setSpacing(2);
+	checks->setContentsMargins(0, 6, 0, 0);
 	left->addLayout(checks);
-	checks->addWidget(makeCheck(IDC_MARKLINE_CHECK, QStringLiteral("Book&mark line")));
-	checks->addWidget(makeCheck(IDC_PURGE_CHECK, QStringLiteral("Purge for each search")));
-	checks->addWidget(makeCheck(IDC_BACKWARDDIRECTION, QStringLiteral("Backward direction")));
+	checks->addWidget(keepPlace(makeCheck(IDC_BACKWARDDIRECTION, QStringLiteral("Backward direction"))));
 	checks->addWidget(makeCheck(IDWHOLEWORD, QStringLiteral("Match &whole word only")));
 	checks->addWidget(makeCheck(IDMATCHCASE, QStringLiteral("Match &case")));
-	checks->addWidget(makeCheck(IDWRAP, QStringLiteral("Wra&p around")));
+	checks->addWidget(keepPlace(makeCheck(IDWRAP, QStringLiteral("Wra&p around"))));
+	left->addStretch(1);
 
 	auto* modeGroup = new QGroupBox(QStringLiteral("Search Mode"), this);
 	_ctrls[IDC_MODE_STATIC] = modeGroup;
@@ -2985,21 +3000,22 @@ void FindReplaceDlg::create()
 	regexRow->addStretch(1);
 	modeLayout->addLayout(regexRow);
 	left->addWidget(modeGroup);
-	left->addStretch(1);
 
-	// --- right: action buttons
+	// --- right: action buttons (upstream: one column at x=298, the side check boxes at x=393), Close and
+	// Transparency at the bottom
 	auto* right = new QVBoxLayout;
 	right->setSpacing(4);
 	body->addLayout(right);
 
-	auto* inSelRow = new QHBoxLayout;
-	inSelRow->addWidget(makeCheck(IDC_IN_SELECTION_CHECK, QStringLiteral("In select&ion")));
-	inSelRow->addStretch(1);
-	auto* twoButtons = makeCheck(IDC_2_BUTTONS_MODE, QString());
-	twoButtons->setToolTip(QString::fromStdWString(pNativeSpeaker->getLocalizedStrFromID("two-find-buttons-tip", L"2 find buttons mode")));
-	inSelRow->addWidget(twoButtons);
-	right->addLayout(inSelRow);
+	auto* actions = new QGridLayout;
+	actions->setHorizontalSpacing(4);
+	actions->setVerticalSpacing(0);
+	right->addLayout(actions);
 
+	// row 0: In selection (Find, Replace, Mark)
+	actions->addWidget(makeCheck(IDC_IN_SELECTION_CHECK, QStringLiteral("In select&ion")), 0, 0);
+
+	// row 1: Find Next, or ▲ / ▼ Find Next (2 buttons mode), or Find All (Find in Files, Find in Projects)
 	auto* findRow = new QHBoxLayout;
 	findRow->setSpacing(2);
 	QPushButton* findPrev = makeButton(IDC_FINDPREV, QStringLiteral("▲"));
@@ -3010,33 +3026,71 @@ void FindReplaceDlg::create()
 	findRow->addWidget(findPrev);
 	findRow->addWidget(findNextBtn, 1);
 	findRow->addWidget(findNextOk, 1);
-	right->addLayout(findRow);
+	actions->addLayout(findRow, 1, 0);
+	QPushButton* fifFind = makeButton(IDD_FINDINFILES_FIND_BUTTON, QStringLiteral("Find All"));
+	actions->addWidget(fifFind, 1, 0);
+	auto* twoButtons = makeCheck(IDC_2_BUTTONS_MODE, QString());
+	twoButtons->setToolTip(QString::fromStdWString(pNativeSpeaker->getLocalizedStrFromID("two-find-buttons-tip", L"2 find buttons mode")));
+	actions->addWidget(keepPlace(twoButtons), 1, 1);
 
-	right->addWidget(makeButton(IDCCOUNTALL, QStringLiteral("Coun&t")));
-	right->addWidget(makeButton(IDC_FINDALL_CURRENTFILE, QStringLiteral("Find All in Current &Document")));
-	right->addWidget(makeButton(IDC_FINDALL_OPENEDFILES, QStringLiteral("Find All in All &Opened Documents")));
-
-	auto* replaceRow = new QHBoxLayout;
-	replaceRow->addWidget(makeButton(IDREPLACE, QStringLiteral("&Replace")), 1);
+	// row 2: Count, Replace, Replace in Files, Replace in Projects, Mark All
+	QPushButton* countAll = makeButton(IDCCOUNTALL, QStringLiteral("Coun&t"));
+	QPushButton* replace = makeButton(IDREPLACE, QStringLiteral("&Replace"));
+	QPushButton* replaceInFiles = makeButton(IDD_FINDINFILES_REPLACEINFILES, QStringLiteral("Replace in Files"));
+	QPushButton* replaceInProjects = makeButton(IDD_FINDINFILES_REPLACEINPROJECTS, QStringLiteral("Replace in Projects"));
+	QPushButton* markAll = makeButton(IDCMARKALL, QStringLiteral("Mark All"));
+	for (QPushButton* button : { countAll, replace, replaceInFiles, replaceInProjects, markAll })
+		actions->addWidget(button, 2, 0);
 	auto* replaceAndStop = makeCheck(IDC_REPLACEANDSTOP, QString());
 	replaceAndStop->setToolTip(QString::fromStdWString(pNativeSpeaker->getLocalizedStrFromID("replace-and-stop-tip", L"After replacing, don't move to the following occurrence")));
-	replaceRow->addWidget(replaceAndStop);
-	right->addLayout(replaceRow);
-	right->addWidget(makeButton(IDREPLACEALL, QStringLiteral("Replace &All")));
-	auto* replaceOpenedRow = new QHBoxLayout;
-	replaceOpenedRow->addWidget(makeButton(IDC_REPLACE_OPENEDFILES, QStringLiteral("Replace All in All Opened Doc&uments")), 1);
+	actions->addWidget(replaceAndStop, 2, 1);
+
+	// row 3: Find All in Current Document, Replace All, Clear all marks; In all sub-folders or Project Panel 1
+	QPushButton* findAllCurrent = makeButton(IDC_FINDALL_CURRENTFILE, QStringLiteral("Find All in Current &Document"));
+	QPushButton* replaceAll = makeButton(IDREPLACEALL, QStringLiteral("Replace &All"));
+	QPushButton* clearAll = makeButton(IDC_CLEAR_ALL, QStringLiteral("Clear all marks"));
+	for (QPushButton* button : { findAllCurrent, replaceAll, clearAll })
+		actions->addWidget(button, 3, 0);
+	actions->addWidget(makeCheck(IDD_FINDINFILES_RECURSIVE_CHECK, QStringLiteral("In all su&b-folders")), 3, 0, 1, 2);
+	actions->addWidget(makeCheck(IDD_FINDINFILES_PROJECT1_CHECK, QStringLiteral("Project Panel 1")), 3, 0, 1, 2);
+
+	// row 4: Find All in All Opened Documents, Replace All in All Opened Documents, Copy Marked Text; In hidden
+	// folders or Project Panel 2
+	QPushButton* findAllOpened = makeButton(IDC_FINDALL_OPENEDFILES, QStringLiteral("Find All in All &Opened Documents"));
+	QPushButton* replaceOpened = makeButton(IDC_REPLACE_OPENEDFILES, QStringLiteral("Replace All in All Opened Doc&uments"));
+	QPushButton* copyMarked = makeButton(IDC_COPY_MARKED_TEXT, QStringLiteral("Copy Marked Text"));
+	for (QPushButton* button : { findAllOpened, replaceOpened, copyMarked })
+		actions->addWidget(button, 4, 0);
 	auto* confirmReplace = makeCheck(IDC_CONFIRMREPLACEOPENDOCS, QString());
 	confirmReplace->setToolTip(QString::fromStdWString(pNativeSpeaker->getLocalizedStrFromID("confirm-replace-in-all-open-docs-tip", L"Confirm \"Replace All in All Opened Documents\" action")));
-	replaceOpenedRow->addWidget(confirmReplace);
-	right->addLayout(replaceOpenedRow);
+	actions->addWidget(confirmReplace, 4, 1);
+	actions->addWidget(makeCheck(IDD_FINDINFILES_INHIDDENDIR_CHECK, QStringLiteral("In &hidden folders")), 4, 0, 1, 2);
+	actions->addWidget(makeCheck(IDD_FINDINFILES_PROJECT2_CHECK, QStringLiteral("Project Panel 2")), 4, 0, 1, 2);
 
-	right->addWidget(makeButton(IDD_FINDINFILES_FIND_BUTTON, QStringLiteral("Find All")));
-	right->addWidget(makeButton(IDD_FINDINFILES_REPLACEINFILES, QStringLiteral("Replace in Files")));
-	right->addWidget(makeButton(IDD_FINDINFILES_REPLACEINPROJECTS, QStringLiteral("Replace in Projects")));
-	right->addWidget(makeButton(IDCMARKALL, QStringLiteral("Mark All")));
-	right->addWidget(makeButton(IDC_CLEAR_ALL, QStringLiteral("Clear all marks")));
-	right->addWidget(makeButton(IDC_COPY_MARKED_TEXT, QStringLiteral("Copy Marked Text")));
-	right->addWidget(makeButton(IDCANCEL, QStringLiteral("Close")));
+	// row 5: Project Panel 3
+	actions->addWidget(makeCheck(IDD_FINDINFILES_PROJECT3_CHECK, QStringLiteral("Project Panel 3")), 5, 0, 1, 2);
+
+	// the rows keep their height when a tab leaves them empty, and the buttons their width
+	const int rowHeight = std::max({ findNextOk->sizeHint().height(), twoButtons->sizeHint().height(),
+		replaceAndStop->sizeHint().height(), confirmReplace->sizeHint().height() });
+	for (int row = 0; row <= 5; ++row)
+		actions->setRowMinimumHeight(row, rowHeight + 4);
+	int buttonWidth = 0;
+	const QList<QPushButton*> actionButtons = { findNextOk, fifFind, countAll, replace, replaceInFiles, replaceInProjects,
+		markAll, findAllCurrent, replaceAll, clearAll, findAllOpened, replaceOpened, copyMarked };
+	for (QPushButton* button : actionButtons)
+		buttonWidth = std::max(buttonWidth, button->sizeHint().width());
+	for (QPushButton* button : actionButtons)
+		button->setMinimumWidth(buttonWidth);
+	actions->setColumnMinimumWidth(1, twoButtons->sizeHint().width());
+	right->addStretch(1);
+
+	QPushButton* close = makeButton(IDCANCEL, QStringLiteral("Close"));
+	close->setMinimumWidth(buttonWidth);
+	auto* closeRow = new QHBoxLayout;
+	closeRow->addWidget(close);
+	closeRow->addSpacing(actions->horizontalSpacing() + twoButtons->sizeHint().width());
+	right->addLayout(closeRow);
 
 	// Transparency (upstream IDC_TRANSPARENT_*)
 	auto* transparentGroup = new QGroupBox(this);
@@ -3063,7 +3117,6 @@ void FindReplaceDlg::create()
 	});
 	transparentLayout->addWidget(slider, 1, 1, 2, 1);
 	right->addWidget(transparentGroup);
-	right->addStretch(1);
 
 	_statusBar = new QLabel(this);
 	_statusBar->setFrameShape(QFrame::StyledPanel);
