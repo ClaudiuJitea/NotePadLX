@@ -431,12 +431,19 @@ void ScintillaEditView::keyPressEvent(QKeyEvent* event)
 
 	// WM_CHAR: prevent "control characters" from being entered in text
 	// (don't need to be concerned about Tab or CR or LF etc here)
+	// NPLX: a Qt key event is WM_KEYDOWN and WM_CHAR together, and Ctrl+<letter> carries its control character as
+	// text (Ctrl+D = "\x04", on Wayland and X11): only the character is dropped, the key still goes to Scintilla
+	// for its key commands (Ctrl+D = SCI_LINEDUPLICATE)
 	const QString text = event->text();
 	if (NppParameters::getInstance().getSVP()._npcNoInputC0 && text.size() == 1 && (text[0].unicode() <= 31 || text[0].unicode() == 127)
 		&& event->key() != Qt::Key_Tab && event->key() != Qt::Key_Return && event->key() != Qt::Key_Enter
 		&& event->key() != Qt::Key_Backspace && event->key() != Qt::Key_Escape && event->key() != Qt::Key_Delete
 		&& event->key() != Qt::Key_Backtab)
 	{
+		QKeyEvent keyOnly(event->type(), event->key(), event->modifiers(), event->nativeScanCode(),
+			event->nativeVirtualKey(), event->nativeModifiers(), QString(), event->isAutoRepeat(),
+			static_cast<ushort>(event->count()));
+		keyPressEvent(&keyOnly);
 		event->accept();
 		return;
 	}

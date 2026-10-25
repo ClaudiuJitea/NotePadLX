@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.5" date="2026-10-25">
+      <description>
+        <p>The editor keys work again: Duplicate Line (Ctrl+D), Cut / Delete Line, Select All, Copy, Cut, Paste, Undo and Redo.</p>
+      </description>
+    </release>
     <release version="0.4" date="2026-10-25">
       <description>
         <p>The caret blinks at the start of a line: the editor's first pixel column of text is painted again.</p>

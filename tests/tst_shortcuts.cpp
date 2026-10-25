@@ -243,7 +243,11 @@ private slots:
 		else
 			view()->execute(SCI_GOTOPOS, caret);
 		QCoreApplication::processEvents(); // SCN_UPDATEUI: a selection enables the case commands (upstream checkClipboard)
-		QTest::keyClick(view(), static_cast<Qt::Key>(key), Qt::KeyboardModifiers(modifiers));
+		// the text of a real key press (xkb): Ctrl+<letter> carries its control character, Ctrl+D = "\x04"
+		QString keyText;
+		if ((modifiers & Qt::ControlModifier) && key >= Qt::Key_A && key <= Qt::Key_Z)
+			keyText = QChar(key - Qt::Key_A + 1);
+		QTest::sendKeyEvent(QTest::Click, view(), static_cast<Qt::Key>(key), keyText, Qt::KeyboardModifiers(modifiers));
 		QCOMPARE(QString::fromStdString(view()->getText()), after);
 		_npp->command(IDM_FILE_CLOSE);
 	}

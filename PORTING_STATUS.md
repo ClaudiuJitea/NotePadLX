@@ -14,9 +14,19 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 7. Dialogs and tools | 🚧 In progress: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper done; Preferences next |
 | 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.4); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.5); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.4** (2026‑10‑25): sessions 10–12 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.5** (2026‑10‑25): sessions 10–13 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 13 (2026‑10‑25): version 0.5 — the editor keys
+
+- **Keys:** the Scintilla keys Ctrl+<letter> did nothing on a real keyboard (Ctrl+D Duplicate Line, Ctrl+L,
+  Ctrl+Shift+L, Ctrl+A, Ctrl+C/X/V, Ctrl+Z/Y). A real key press carries its control character as text (Ctrl+D =
+  "\x04", on Wayland and X11), and the port of upstream's WM_CHAR filter (`_npcNoInputC0`) swallowed the whole key
+  event; on Windows WM_KEYDOWN runs the command and only WM_CHAR is dropped. Now only the character is dropped and
+  the key still goes to Scintilla (`ScintillaEditView::keyPressEvent`). QTest::keyClick sends "d" as the text, so
+  the tests did not see it: `tst_shortcuts commonEditingKeys` now sends the text of a real key press. Found with
+  `QT_LOGGING_RULES=qt.gui.shortcutmap=true` on the user's GNOME Wayland session.
 
 ## Session 12 (2026‑10‑25): version 0.4 — the caret at the start of a line
 
@@ -25,8 +35,7 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
   began 1 pixel right of the margins and the first pixel column of text was never painted, so the caret drawn
   there stayed on the screen. The client area now starts at 0,0, as Win32 `GetClientRect` (`// NPLX:` in
   `third_party/scintilla/qt/ScintillaEditBase/PlatQt.cpp`). Test: `tst_look caretBlinksAtLineStart`.
-- **Keys:** a report that no shortcut works could not be reproduced (GNOME Wayland with and without IBus, the
-  user's configuration and session, `.deb` and AppImage: the keys reach their commands). Being investigated.
+- **Keys:** a report that the shortcuts do not work: found and fixed in 0.5 (session 13).
 
 ## Session 11 (2026‑10‑25): version 0.3 — About, updates, keys, Edit and View commands
 
