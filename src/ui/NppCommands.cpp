@@ -24,15 +24,20 @@
 
 #include "RunDlg.h"
 #include "RunMacroDlg.h"
+#include "AboutDlg.h"
 #include "ShortcutMapper.h"
 #include "columnEditor.h"
 #include "md5Dlgs.h"
 #include "VerticalFileSwitcher.h"
 
+#include <filesystem>
+#include <memory>
 #include <mutex>
 
 #include <QApplication>
 #include <QClipboard>
+#include <QGuiApplication>
+#include <QMimeData>
 #include <QDesktopServices>
 #include <QDBusConnection>
 #include <QDateTime>
@@ -64,6 +69,9 @@
 #include "Parameters.h"
 #include "ScintillaEditView.h"
 #include "SortLocale.h"
+
+// NPLX: upstream CF_NPPTEXTLEN (the byte length of the CF_TEXT data); the bytes themselves here, NUL bytes included
+#define NPLX_MIME_BINARY_TEXT "application/x-notepadlx-binary-text"
 #include "UiServices.h"
 #include "Sorters.h"
 #include "menuCmdID.h"
@@ -234,6 +242,203 @@ void Notepad_plus::command(int id)
 			else if (QWidget* w = QApplication::focusWidget())
 			{
 				QMetaObject::invokeMethod(w, "copy");
+			}
+			break;
+		}
+
+		case IDM_EDIT_COPY_BINARY:
+		case IDM_EDIT_CUT_BINARY:
+		{
+			size_t textLen = _pEditView->execute(SCI_GETSELTEXT, 0, 0);
+			if (!textLen)
+				return;
+
+			const size_t strSize = textLen + 1;
+			auto pBinText = std::make_unique<char[]>(strSize);
+			std::fill_n(pBinText.get(), strSize, '\0');
+
+			_pEditView->getSelectedTextToMultiChar(pBinText.get(), textLen + 1);
+
+			// NPLX: upstream puts the bytes as CF_TEXT and their length as CF_NPPTEXTLEN; here the bytes as
+			// text/plain and, untouched (NUL bytes included), as NotePadLX's binary format
+			const QByteArray bytes(pBinText.get(), static_cast<qsizetype>(textLen));
+			pBinText.reset(nullptr); // free possible big membuf ASAP
+			auto* mime = new QMimeData;
+			mime->setText(QString::fromUtf8(bytes));
+			mime->setData(QStringLiteral(NPLX_MIME_BINARY_TEXT), bytes);
+			QGuiApplication::clipboard()->setMimeData(mime);
+
+			if (id == IDM_EDIT_CUT_BINARY)
+				_pEditView->execute(SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(""));
+
+			break;
+		}
+
+		case IDM_EDIT_PASTE_BINARY:
+		{
+			std::lock_guard<std::mutex> lock(command_mutex);
+			const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+			if (!mime || !mime->hasText())
+				return;
+
+			if (mime->hasFormat(QStringLiteral(NPLX_MIME_BINARY_TEXT)))
+			{
+				const QByteArray bytes = mime->data(QStringLiteral(NPLX_MIME_BINARY_TEXT));
+				_pEditView->execute(SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(""));
+				_pEditView->execute(SCI_ADDTEXT, static_cast<uptr_t>(bytes.size()), reinterpret_cast<LPARAM>(bytes.constData()));
+			}
+			else
+			{
+				const QByteArray text = mime->text().toUtf8();
+				_pEditView->execute(SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(text.constData()));
+			}
+		}
+		break;
+
+		case IDM_EDIT_PASTE_AS_RTF:
+		case IDM_EDIT_PASTE_AS_HTML:
+		{
+			// upstream: the "HTML Format" / "Rich Text Format" clipboard data, as text. NPLX: text/html, text/rtf
+			std::lock_guard<std::mutex> lock(command_mutex);
+			const QMimeData* mime = QGuiApplication::clipboard()->mimeData();
+			if (!mime)
+				return;
+
+			QByteArray data;
+			const QStringList formats = (id == IDM_EDIT_PASTE_AS_HTML)
+				? QStringList{ QStringLiteral("text/html") }
+				: QStringList{ QStringLiteral("text/rtf"), QStringLiteral("application/rtf"), QStringLiteral("text/richtext") };
+			for (const QString& f : formats)
+			{
+				if (mime->hasFormat(f))
+				{
+					data = mime->data(f);
+					break;
+				}
+			}
+			if (data.isEmpty())
+				return;
+
+			data.append('\0');
+			_pEditView->execute(SCI_REPLACESEL, 0, reinterpret_cast<LPARAM>(data.constData()));
+		}
+		break;
+
+		case IDM_EDIT_REDACT_SELECTION:
+		{
+			_pEditView->execute(SCI_BEGINUNDOACTION);
+
+			const int selCount = static_cast<int>(_pEditView->execute(SCI_GETSELECTIONS));
+			const bool useBullet = QGuiApplication::queryKeyboardModifiers() & Qt::ShiftModifier; // GetKeyState(VK_SHIFT)
+
+			const int codePage = static_cast<int>(_pEditView->execute(SCI_GETCODEPAGE));
+			const bool isUnicode = (codePage == SC_CP_UTF8);
+
+			std::string maskSymbol;
+			if (isUnicode)
+				maskSymbol = useBullet ? "\xE2\x97\x8F" : "\xE2\x96\x88"; // ● or █ (UTF-8)
+			else
+				maskSymbol = useBullet ? "." : "#";
+
+
+			for (int i = 0; i < selCount; ++i)
+			{
+				WPARAM start = _pEditView->execute(SCI_GETSELECTIONNSTART, i);
+				LPARAM end = _pEditView->execute(SCI_GETSELECTIONNEND, i);
+				int charCount = static_cast<int>(_pEditView->execute(SCI_COUNTCHARACTERS, start, end));
+
+				if (charCount > 0)
+				{
+
+					std::string maskStr;
+
+					for (int j = 0; j < charCount; ++j)
+					{
+						// Get byte position of the jth character, starting from "start"
+						auto bytePos = _pEditView->execute(SCI_POSITIONRELATIVE, start, j);
+						char aChar = static_cast<char>(_pEditView->execute(SCI_GETCHARAT, bytePos));
+
+						if (aChar == '\r' || aChar == '\n')
+							maskStr += aChar;
+						else
+							maskStr += maskSymbol;
+					}
+
+					_pEditView->execute(SCI_SETTARGETRANGE, start, end);
+					_pEditView->execute(SCI_REPLACETARGET, static_cast<WPARAM>(-1), reinterpret_cast<LPARAM>(maskStr.c_str()));
+				}
+			}
+
+			_pEditView->execute(SCI_ENDUNDOACTION);
+		}
+		break;
+
+		case IDM_EDIT_OPENSELECTEDFILEFOLDERINEXPLORER:
+		case IDM_EDIT_OPENSELECTEDFILETOEDIT:
+		{
+			if (_pEditView->execute(SCI_GETSELECTIONS) != 1) // Multi-Selection || Column mode || no selection
+				return;
+
+			const int strSize = CURRENTWORD_MAXLENGTH;
+			auto currentWord = std::make_unique<wchar_t[]>(strSize);
+			std::fill_n(currentWord.get(), strSize, L'\0');
+
+			nppMessage(NPPM_GETFILENAMEATCURSOR, CURRENTWORD_MAXLENGTH, reinterpret_cast<LPARAM>(currentWord.get()));
+
+			// Try to expand environment strings, nevertheless currentWord is copied with or without expansion
+			// NPLX: %VAR%, $VAR and ${VAR} (upstream ::ExpandEnvironmentStringsW); ~ is the home folder
+			std::wstring fullTargetPath = expandEnvironmentStrings(currentWord.get());
+			if (fullTargetPath.size() > 1 && fullTargetPath[0] == L'~' && fullTargetPath[1] == L'/')
+				fullTargetPath = QDir::homePath().toStdWString() + fullTargetPath.substr(1);
+
+			if (!doesPathExist(fullTargetPath.c_str()))
+			{
+				// Concatenate relative path
+				auto currentDir = std::make_unique<wchar_t[]>(strSize);
+				std::fill_n(currentDir.get(), strSize, L'\0');
+				nppMessage(NPPM_GETCURRENTDIRECTORY, CURRENTWORD_MAXLENGTH, reinterpret_cast<LPARAM>(currentDir.get()));
+
+				fullTargetPath = currentDir.get();
+				fullTargetPath += L"/"; // NPLX: was L"\\"
+				fullTargetPath += currentWord.get();
+			}
+
+			if (id == IDM_EDIT_OPENSELECTEDFILEFOLDERINEXPLORER)
+			{
+				if (!doesPathExist(fullTargetPath.c_str()))
+				{
+					_nativeLangSpeaker.messageBox("FilePathNotFoundWarning",
+						L"The path you're trying to open doesn't exist.",
+						L"Open Path",
+						MB_OK | MB_APPLMODAL);
+					return;
+				}
+
+				std::filesystem::path canonicalPath(fullTargetPath);
+				canonicalPath = canonicalPath.lexically_normal();
+
+				// openInExplorerAndSelect, or the folder itself
+				const QString path = QString::fromStdWString(canonicalPath.wstring());
+				if (QFileInfo(path).isDir())
+					nplx::desktop::openFolder(path);
+				else
+					nplx::desktop::showFileInFileManager(path);
+			}
+			else // IDM_EDIT_OPENSELECTEDFILETOEDIT
+			{
+				if (!doesFileExist(fullTargetPath.c_str()))
+				{
+					_nativeLangSpeaker.messageBox("FilePathNotFoundWarning",
+						L"The path you're trying to open doesn't exist.",
+						L"Open Path",
+						MB_OK | MB_APPLMODAL);
+					return;
+				}
+
+				// NPLX: upstream runs notepad++.exe with the file, which hands it to the running instance; open it here
+				const BufferID bufID = doOpen(std::filesystem::path(fullTargetPath).lexically_normal().wstring());
+				if (bufID != BUFFER_INVALID)
+					switchToFile(bufID);
 			}
 			break;
 		}
@@ -1294,14 +1499,33 @@ void Notepad_plus::command(int id)
 
 		case IDM_ABOUT:
 		{
-			// NPLX_TODO(Phase 8): port of AboutDlg
-			QMessageBox::about(this, tr("About NotePadLX"),
-				tr("<h3>NotePadLX %1</h3>"
-				   "<p>A Linux port of <a href=\"https://notepad-plus-plus.org/\">Notepad++</a>, built with Qt %2 and Scintilla.</p>"
-				   "<p><a href=\"" NPLX_HOMEPAGE_URL "\">" NPLX_HOMEPAGE_URL "</a></p>"
-				   "<p>Notepad++ is © Don HO and the Notepad++ contributors.<br>"
-				   "NotePadLX is free software under the GNU General Public License v3.</p>")
-				.arg(QApplication::applicationVersion(), QString::fromLatin1(qVersion())));
+			// NPLX: upstream also shows a quote when the selection names an author (easter eggs); the About box only
+			if (!_aboutDlg)
+				_aboutDlg = new AboutDlg([this]() { command(IDM_UPDATE_NPP); }, [this]() { command(IDM_DEBUGINFO); }, this);
+			_aboutDlg->doDialog();
+			break;
+		}
+
+		case IDM_DEBUGINFO:
+		{
+			if (!_debugInfoDlg)
+				_debugInfoDlg = new DebugInfoDlg(this);
+			_debugInfoDlg->doDialog();
+			// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_debugInfoDlg, "DebugInfo")
+			break;
+		}
+
+		case IDM_CMDLINEARGUMENTS:
+		{
+			if (!_cmdLineArgsDlg)
+				_cmdLineArgsDlg = new CmdLineArgsDlg(this);
+			_cmdLineArgsDlg->doDialog();
+			break;
+		}
+
+		case IDM_UPDATE_NPP:
+		{
+			checkForUpdates(); // NPLX: upstream launches the WinGUp updater
 			break;
 		}
 
@@ -2381,6 +2605,28 @@ void Notepad_plus::command(int id)
 			inverseMarks();
 			break;
 
+		case IDM_VIEW_FULLSCREENTOGGLE:
+		{
+			if (!_beforeSpecialView._isDistractionFree)
+				fullScreenToggle();
+		}
+		break;
+
+		case IDM_VIEW_POSTIT :
+		{
+			if (!_beforeSpecialView._isDistractionFree)
+				postItToggle();
+		}
+		break;
+
+		case IDM_VIEW_DISTRACTIONFREE:
+		{
+			if ((_beforeSpecialView._isDistractionFree && _beforeSpecialView._isFullScreen && _beforeSpecialView._isPostIt) ||
+				(!_beforeSpecialView._isDistractionFree && !_beforeSpecialView._isFullScreen && !_beforeSpecialView._isPostIt))
+				distractionFreeToggle();
+		}
+		break;
+
 	    case IDM_VIEW_ALWAYSONTOP:
 		{
 			const bool check = !isMenuItemChecked(id);
@@ -3106,4 +3352,34 @@ QWidget* Notepad_plus::getHashDlg(int cmdID) const
 		case IDM_TOOL_SHA512_GENERATEFROMFILE: return _sha512FromFilesDlg;
 		default: return nullptr;
 	}
+}
+
+void Notepad_plus::checkForUpdates()
+{
+	// NPLX: replaces the WinGUp updater: the latest release of the NotePadLX repository
+	if (!_updateChecker)
+		_updateChecker = new UpdateChecker(this);
+	statusBar()->showMessage(tr("Checking for updates..."), 15000);
+	_updateChecker->check([this](UpdateChecker::Result result, const QString& latest, const QString& page, const QString& error) {
+		statusBar()->clearMessage();
+		switch (result)
+		{
+			case UpdateChecker::Result::NewVersion:
+			{
+				const std::wstring msg = QStringLiteral("NotePadLX %1 is available (you have %2).\n\nDo you want to open its download page?")
+					.arg(latest, QStringLiteral(NPLX_VERSION)).toStdWString();
+				if (nplx::messageBox(msg, L"Check for Updates", MB_YESNO | MB_ICONINFORMATION) == IDYES)
+					QDesktopServices::openUrl(QUrl(page));
+				break;
+			}
+			case UpdateChecker::Result::UpToDate:
+				nplx::messageBox(QStringLiteral("NotePadLX %1 is the latest version.").arg(QStringLiteral(NPLX_VERSION)).toStdWString(),
+					L"Check for Updates", MB_OK | MB_ICONINFORMATION);
+				break;
+			case UpdateChecker::Result::Error:
+				nplx::messageBox(QStringLiteral("The latest version could not be checked:\n%1\n\nThe releases are on %2/releases")
+					.arg(error, QStringLiteral(NPLX_HOMEPAGE_URL)).toStdWString(), L"Check for Updates", MB_OK | MB_ICONWARNING);
+				break;
+		}
+	});
 }

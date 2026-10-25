@@ -24,6 +24,7 @@
 #include <QIcon>
 
 #include "CmdLine.h"
+#include "AboutDlg.h"
 #include "NplxStyle.h"
 #include "Notepad_plus.h"
 #include "Parameters.h"
@@ -97,6 +98,19 @@ int main(int argc, char* argv[])
 	NppCommandLine effectiveCmdLine = cmdLine;
 	effectiveCmdLine._params = cmdLineParams;
 	applyCommandLineAfterLoad(effectiveCmdLine);
+
+	// ? > Command Line Arguments..., Debug Info
+	nplx::setCommandLineHelpText(commandLineHelpText());
+	{
+		std::wstring cmdLineString;
+		for (int i = 0; i < argc; ++i)
+		{
+			if (i)
+				cmdLineString += L' ';
+			cmdLineString += QString::fromLocal8Bit(argv[i]).toStdWString();
+		}
+		nplx::setCommandLine(cmdLineString);
+	}
 
 	// NPLX: the NotePadLX look (style, palette, stylesheet, icons), after load() so upstream dark mode is known
 	nplx::style::apply(app);

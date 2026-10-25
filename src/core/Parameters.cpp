@@ -507,7 +507,7 @@ static constexpr WinMenuKeyDefinition winKeyDefs[]
 	// The following two commands are not in menu if (nppGUI._doesExistUpdater == 0).
 	// They cannot be derived from menu then, only for this reason the text is specified here.
 	// In localized environments, the text comes preferably from xml Menu/Main/Commands.
-	{ VK_NULL,    IDM_UPDATE_NPP,                               false, false, false, L"Update Notepad++" },
+	{ VK_NULL,    IDM_UPDATE_NPP,                               false, false, false, L"Check for Updates" }, // NPLX: was "Update Notepad++" (WinGUp)
 	{ VK_NULL,    IDM_CONFUPDATERPROXY,                         false, false, false, L"Set Updater Proxy..." },
 	{ VK_NULL,    IDM_DEBUGINFO,                                false, false, false, nullptr },
 	{ VK_F1,      IDM_ABOUT,                                    false, false, false, nullptr }

@@ -196,6 +196,58 @@ private slots:
 		QVERIFY(selectAll->shortcut().isEmpty());
 	}
 
+	void commonEditingKeys_data()
+	{
+		QTest::addColumn<QString>("before");
+		QTest::addColumn<int>("caret");
+		QTest::addColumn<int>("key");
+		QTest::addColumn<int>("modifiers");
+		QTest::addColumn<QString>("after");
+		const int C = Qt::ControlModifier, S = Qt::ShiftModifier, A = Qt::AltModifier;
+		// Notepad++ default keys (winKeyDefs and scintKeyDefs); caret on line 0
+		QTest::newRow("Ctrl+D duplicate line") << "ab\ncd" << 0 << int(Qt::Key_D) << C << "ab\nab\ncd";
+		QTest::newRow("Ctrl+Shift+Down move line down") << "ab\ncd" << 0 << int(Qt::Key_Down) << (C | S) << "cd\nab";
+		QTest::newRow("Ctrl+Shift+Up move line up") << "ab\ncd" << 3 << int(Qt::Key_Up) << (C | S) << "cd\nab";
+		QTest::newRow("Ctrl+Shift+L delete line") << "ab\ncd" << 0 << int(Qt::Key_L) << (C | S) << "cd";
+		QTest::newRow("Ctrl+L cut line") << "ab\ncd" << 0 << int(Qt::Key_L) << C << "cd";
+		QTest::newRow("Ctrl+U lower case") << "AB\ncd" << -1 << int(Qt::Key_U) << C << "ab\ncd";
+		QTest::newRow("Ctrl+Shift+U upper case") << "ab\ncd" << -1 << int(Qt::Key_U) << (C | S) << "AB\ncd";
+		QTest::newRow("Ctrl+J join lines") << "ab\ncd" << -2 << int(Qt::Key_J) << C << "ab cd";
+		QTest::newRow("Ctrl+Z undo") << "ab" << 2 << int(Qt::Key_Z) << C << "ab"; // nothing to undo
+		QTest::newRow("Tab indent") << "ab" << 0 << int(Qt::Key_Tab) << 0 << "\tab";
+		QTest::newRow("Ctrl+Backspace delete word left") << "ab cd" << 5 << int(Qt::Key_Backspace) << C << "ab ";
+		QTest::newRow("Ctrl+Delete delete word right") << "ab cd" << 0 << int(Qt::Key_Delete) << C << "cd";
+		QTest::newRow("Ctrl+Shift+Backspace delete line left") << "ab cd" << 3 << int(Qt::Key_Backspace) << (C | S) << "cd";
+		QTest::newRow("Ctrl+Shift+Delete delete line right") << "ab cd" << 3 << int(Qt::Key_Delete) << (C | S) << "ab ";
+		QTest::newRow("Alt+Shift+Down column select") << "ab\ncd" << 0 << int(Qt::Key_Down) << (A | S) << "ab\ncd";
+		Q_UNUSED(A);
+	}
+
+	void commonEditingKeys()
+	{
+		QFETCH(QString, before);
+		QFETCH(int, caret);
+		QFETCH(int, key);
+		QFETCH(int, modifiers);
+		QFETCH(QString, after);
+
+		_npp->command(IDM_FILE_NEW);
+		_npp->activateWindow();
+		view()->setFocus();
+		view()->setText(before.toStdString().c_str());
+		view()->execute(SCI_EMPTYUNDOBUFFER);
+		if (caret == -1)
+			view()->execute(SCI_SETSEL, 0, 2); // the first line selected
+		else if (caret == -2)
+			view()->execute(SCI_SELECTALL);
+		else
+			view()->execute(SCI_GOTOPOS, caret);
+		QCoreApplication::processEvents(); // SCN_UPDATEUI: a selection enables the case commands (upstream checkClipboard)
+		QTest::keyClick(view(), static_cast<Qt::Key>(key), Qt::KeyboardModifiers(modifiers));
+		QCOMPARE(QString::fromStdString(view()->getText()), after);
+		_npp->command(IDM_FILE_CLOSE);
+	}
+
 	void mapperTabsAndCategories()
 	{
 		QVERIFY(Notepad_plus::isCommandPorted(IDM_SETTING_SHORTCUT_MAPPER));
@@ -217,6 +269,7 @@ private slots:
 			BabyGridWrapper* grid = mapper->grid();
 			QCOMPARE(grid->rowCount(), nbShown);
 			QCOMPARE(rowOf(mapper, QStringLiteral("Update Notepad++")), 0);
+			QVERIFY(rowOf(mapper, QStringLiteral("Check for Updates")) > 0);
 			QCOMPARE(grid->columnCount(), 3);
 			QCOMPARE(grid->horizontalHeaderItem(2)->text(), QStringLiteral("Category"));
 			const int newRow = rowOf(mapper, QStringLiteral("New"));

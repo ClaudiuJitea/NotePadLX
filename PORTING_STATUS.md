@@ -6,17 +6,51 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 |---|---|
 | 0. Bootstrap | ✅ Done (2026‑10‑24) |
 | 1. Portable core | ✅ Done (2026‑10‑24) |
-| 2. Main window | 🚧 Mostly done (menus, toolbar, context menus, 365 commands ported) |
+| 2. Main window | 🚧 Mostly done (menus, toolbar, context menus, 379 commands ported) |
 | 3. Files, sessions, monitoring | 🚧 Mostly done (see session 3) |
 | 4. Find / Replace | 🚧 Mostly done (dialog, Finder, Find in Files, Mark, smart highlight; incremental search open) |
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
 | 7. Dialogs and tools | 🚧 In progress: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper done; Preferences next |
-| 8. Polish and platform integration | ⏳ Planned (dark/light themes and the NotePadLX look done early, in sessions 6–7b) |
+| 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1, 0.2); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.3); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.2** (2026‑10‑25): 0.1 plus the Shortcut Mapper (session 10). Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.3** (2026‑10‑25): sessions 10–11 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 11 (2026‑10‑25): version 0.3 — About, updates, keys, Edit and View commands
+
+- **About box** (`ui/AboutDlg.*`):
+  - The old `QMessageBox::about` cut its lines; it is replaced by a port of upstream AboutDlg in a Qt layout.
+  - Shows the logo, version and bitness, home link, build time with Qt / Scintilla / Lexilla versions, and the
+    GPL notice.
+  - Buttons: Check for Updates…, Debug Info…, OK.
+- **? › Debug Info…:** a port of upstream DebugInfoDlg. Windows-only fields (registry, display adapters, WinGUp,
+  DirectWrite) become the Linux equivalents: OS, kernel, Qt platform (Wayland / X11), desktop and session,
+  screens and scaling, data and settings paths. It has the copy button.
+- **? › Command Line Arguments…:** shows the `--help` text.
+- **? › Check for Updates…** (IDM_UPDATE_NPP, which was removed as the WinGUp updater):
+  - `UpdateChecker` reads the latest GitHub release (`/repos/ClaudiuJitea/NotePadLX/releases/latest`) and
+    compares versions with `QVersionNumber`.
+  - It offers the download page; the URL can be overridden with `NPLX_UPDATE_URL` for tests.
+- **Edit:**
+  - Paste HTML / RTF Content (`text/html`, `text/rtf`).
+  - Copy / Cut / Paste Binary Content: NUL bytes kept through a custom MIME type, in place of CF_NPPTEXTLEN.
+  - On Selection › Open File, Open Containing Folder in File Manager, Redact Selection (█, or ● with Shift).
+  - `NPPM_GETFILENAMEATCURSOR` ported.
+- **View › Toggle Full Screen Mode (F11), Post-It (F12), Distraction Free Mode** (`ui/NppSpecialView.cpp`):
+  - full screen is `showFullScreen` without the menu bar and toolbar;
+  - Post-It is a frameless always-on-top window without the menu, toolbar, tabs and status bar;
+  - Distraction Free adds hiding the second view and the panels, plus upstream's side padding;
+  - the restore button sits in the top-right corner.
+- **Keys:**
+  - `tests/tst_keys.cpp` presses every Notepad++ default key (the Shortcut Mapper's list: menu commands,
+    Scintilla commands, the default macro and Run commands) in the real window. Each one must reach its
+    command; 189 checks.
+  - Only Print, Incremental Search and Full Screen / Post-It were missing; Full Screen and Post-It are now
+    ported.
+  - The default `shortcuts.xml` also gets Google Search (Alt+F2).
+- 379 commands ported; 16/16 test suites pass.
 
 ## Session 10 (2026‑10‑25): Phase 7 — the Shortcut Mapper
 
@@ -112,9 +146,9 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 3/4 leftovers | File › Load Session…, Save Session…; Search › Incremental Search; View › Tab › Apply Color 1–5, Remove Color |
-| 7 | Settings › Preferences…, Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range…; Edit › Paste Special › Paste HTML/RTF Content, Copy/Cut/Paste Binary Content; Edit › On Selection › Open File, Open Containing Folder in File Manager, Redact Selection, Change Search Engine… |
-| 8 | File › Print…, Print Now; View › Toggle Full Screen Mode, Post‑It, Distraction Free Mode; View › Move/Clone › Move to / Open in New Instance; ? › Command Line Arguments…, Debug Info…; the About dialog (port of AboutDlg); localization of the dialogs |
+| 3/4 leftovers | File › Load Session…, Save Session…; Search › Incremental Search (Ctrl+Alt+I); View › Tab › Apply Color 1–5, Remove Color |
+| 7 | Settings › Preferences…, Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range…; Edit › On Selection › Change Search Engine… (a Preferences page) |
+| 8 | File › Print… (Ctrl+P), Print Now; View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |
 
@@ -125,8 +159,8 @@ These are Windows-only features with no Linux equivalent (PROMPT.md §6). They a
 
 - **File › Open Containing Folder › PowerShell** (also in the tab context menu): the Terminal item opens the
   desktop's terminal.
-- **? › Update Notepad++**, **? › Set Updater Proxy…**: the WinGUp auto-updater; updates come from the package
-  manager. Upstream also removes these items when no updater is installed.
+- **? › Set Updater Proxy…**: the WinGUp proxy setting; Qt uses the system proxy. (**? › Update Notepad++** is
+  back as NotePadLX's own **Check for Updates…**, see session 11.)
 
 Renamed for Linux (`linuxMenuText`): Explorer → File Manager, cmd → Terminal, Move to Recycle Bin → Move to Trash,
 Read‑Only Attribute in Windows → in File System, Read‑Only in Notepad++ → in NotePadLX, About Notepad++ → About

@@ -125,3 +125,11 @@ target_compile_definitions(tst_shortcuts PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PR
 target_link_libraries(tst_shortcuts PRIVATE nplx_ui Qt6::Test)
 add_test(NAME shortcuts COMMAND tst_shortcuts)
 set_tests_properties(shortcuts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# the Notepad++ default keys, end to end
+add_executable(tst_keys tst_keys.cpp)
+set_target_properties(tst_keys PROPERTIES AUTOMOC ON)
+target_compile_definitions(tst_keys PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT_SOURCE_DIR}/data")
+target_link_libraries(tst_keys PRIVATE nplx_ui Qt6::Test)
+add_test(NAME keys COMMAND tst_keys)
+set_tests_properties(keys PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

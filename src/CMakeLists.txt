@@ -137,9 +137,12 @@ add_library(nplx_ui STATIC
     ui/RunMacroDlg_rc.h
     ui/ShortcutDlg.cpp
     ui/md5Dlgs.cpp
+    ui/AboutDlg.cpp
+    ui/AboutDlg.h
     ui/BabyGridWrapper.cpp
     ui/BabyGridWrapper.h
     ui/NppShortcuts.cpp
+    ui/NppSpecialView.cpp
     ui/ShortcutMapper.cpp
     ui/ShortcutMapper.h
     ui/ShortcutMapper_rc.h
@@ -170,7 +173,12 @@ target_include_directories(nplx_ui PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated
 target_include_directories(nplx_ui PUBLIC ui)
 target_link_libraries(nplx_ui PUBLIC nplx_editor Qt6::Widgets Qt6::DBus Qt6::Network)
 target_compile_options(nplx_ui PRIVATE ${NPLX_WARNINGS})
-target_compile_definitions(nplx_ui PUBLIC NPLX_HOMEPAGE_URL="${PROJECT_HOMEPAGE_URL}")
+file(READ ${PROJECT_SOURCE_DIR}/third_party/scintilla/version.txt NPLX_SCINTILLA_VERSION)
+file(READ ${PROJECT_SOURCE_DIR}/third_party/lexilla/version.txt NPLX_LEXILLA_VERSION)
+string(STRIP "${NPLX_SCINTILLA_VERSION}" NPLX_SCINTILLA_VERSION)
+string(STRIP "${NPLX_LEXILLA_VERSION}" NPLX_LEXILLA_VERSION)
+target_compile_definitions(nplx_ui PUBLIC NPLX_HOMEPAGE_URL="${PROJECT_HOMEPAGE_URL}" NPLX_VERSION="${PROJECT_VERSION}"
+    NPLX_SCINTILLA_VERSION="${NPLX_SCINTILLA_VERSION}" NPLX_LEXILLA_VERSION="${NPLX_LEXILLA_VERSION}")
 
 # Resources: application icon (:/icons/...) and upstream icons (:/npp/tabbar, :/npp/toolbar-*)
 file(GLOB NPLX_APP_ICONS CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/resources/icons/notepadlx-*.png)
@@ -190,7 +198,6 @@ add_executable(notepadlx
     app/SingleInstance.h
 )
 set_target_properties(notepadlx PROPERTIES AUTOMOC ON)
-target_compile_definitions(notepadlx PRIVATE NPLX_VERSION="${PROJECT_VERSION}")
 target_link_libraries(notepadlx PRIVATE nplx_ui)
 target_compile_options(notepadlx PRIVATE ${NPLX_WARNINGS})
 

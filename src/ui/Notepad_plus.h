@@ -24,8 +24,10 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include <QMainWindow>
+#include <QRect>
 #include <QStringList>
 
 #include "Buffer.h"
@@ -67,6 +69,10 @@ class RunDlg;
 class RunMacroDlg;
 class HashFromFilesDlg;
 class ColumnEditorDlg;
+class AboutDlg;
+class DebugInfoDlg;
+class CmdLineArgsDlg;
+class UpdateChecker;
 class HashFromTextDlg;
 struct SCNotification;
 class SmartHighlighter;
@@ -108,6 +114,31 @@ struct NppMenuDef
 enum FileTransferMode {
 	TransferClone		= 0x01,
 	TransferMove		= 0x02
+};
+
+// upstream VisibleGUIConf: the state of the window before full screen, post-it or distraction free
+struct VisibleGUIConf final
+{
+	bool _isPostIt = false;
+	bool _isFullScreen = false;
+	bool _isDistractionFree = false;
+
+	//Used by postit & fullscreen
+	bool _isMenuShown = true;
+	bool _isToolbarShown = true; // NPLX: upstream hides the rebars
+
+	//used by postit
+	bool _isTabbarShown = true;
+	bool _isAlwaysOnTop = false;
+	bool _isStatusbarShown = true;
+
+	//used by fullscreen (NPLX: was WINDOWPLACEMENT)
+	bool _wasMaximized = false;
+	QRect _normalGeometry;
+
+	//used by distractionFree
+	bool _was2ViewModeOn = false;
+	std::vector<class QDockWidget*> _pVisibleDockingContainers;
 };
 
 class Notepad_plus : public QMainWindow, public NppBufferHost
@@ -278,6 +309,17 @@ public:
 	RunDlg* getRunDlg() const { return _runDlg; } // NPLX: tests
 	RunMacroDlg* getRunMacroDlg() const { return _runMacroDlg; } // NPLX: tests
 	ColumnEditorDlg* getColumnEditorDlg() const { return _colEditorDlg; } // NPLX: tests
+	AboutDlg* getAboutDlg() const { return _aboutDlg; } // NPLX: tests
+	DebugInfoDlg* getDebugInfoDlg() const { return _debugInfoDlg; } // NPLX: tests
+	CmdLineArgsDlg* getCmdLineArgsDlg() const { return _cmdLineArgsDlg; } // NPLX: tests
+	void checkForUpdates(); // NPLX: ? > Check for Updates... (replaces the WinGUp updater)
+
+	// --- full screen, post-it, distraction free (NppSpecialView.cpp; upstream Notepad_plus.cpp)
+	void fullScreenToggle();
+	void postItToggle();
+	void distractionFreeToggle();
+	const VisibleGUIConf& specialView() const { return _beforeSpecialView; } // NPLX: tests
+	class QToolButton* restoreButton() const { return _restoreButton; } // NPLX: tests
 	QWidget* getHashDlg(int cmdID) const; // NPLX: tests; the hash dialog of a Tools > MD5/SHA command
 
 	void activateDoc(size_t pos);
@@ -368,6 +410,7 @@ public:
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 	void closeEvent(QCloseEvent* event) override;
+	void resizeEvent(QResizeEvent* event) override; // NPLX: keeps the restore button in the top-right corner
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
 
@@ -416,6 +459,10 @@ private:
 	class ShortcutMapper* _pShortcutMapper = nullptr; // upstream: the open Shortcut Mapper (NPPM_INTERNAL_FINDKEYCONFLICTS)
 	// upstream _md5FromFilesDlg, _md5FromTextDlg, _sha1From..., _sha2From..., _sha512From... (created on first use)
 	ColumnEditorDlg* _colEditorDlg = nullptr; // upstream _colEditorDlg (created on first use)
+	AboutDlg* _aboutDlg = nullptr;
+	DebugInfoDlg* _debugInfoDlg = nullptr;
+	CmdLineArgsDlg* _cmdLineArgsDlg = nullptr;
+	UpdateChecker* _updateChecker = nullptr;
 	HashFromFilesDlg* _md5FromFilesDlg = nullptr;
 	HashFromTextDlg* _md5FromTextDlg = nullptr;
 	HashFromFilesDlg* _sha1FromFilesDlg = nullptr;
@@ -448,6 +495,9 @@ private:
 	std::unique_ptr<AutoCompletion> _autoCompleteSub;
 	SmartHighlighter* _smartHighlighter = nullptr;
 	class QToolBar* _toolBar = nullptr;
+	VisibleGUIConf _beforeSpecialView;
+	class QToolButton* _restoreButton = nullptr; // upstream ButtonDlg _restoreButton
+	void placeRestoreButton();
 	QLabel* _statusBarParts[STATUSBAR_NB_SECTIONS] = {};
 
 	int _activeView = MAIN_VIEW;

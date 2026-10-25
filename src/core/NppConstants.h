@@ -449,6 +449,7 @@ inline constexpr const char SHORTCUT_XML_CONTENT[] = "\
 		<Command name=\"Open selected file path in new instance\" Ctrl=\"no\" Alt=\"yes\" Shift=\"no\" Key=\"117\">$(NPP_FULL_FILE_PATH) $(CURRENT_WORD) -nosession -multiInst</Command>\r\n\
 		-->\r\n\
 		<Command name=\"Get PHP help\" Ctrl=\"no\" Alt=\"yes\" Shift=\"no\" Key=\"112\">https://www.php.net/$(CURRENT_WORD)</Command>\r\n\
+		<Command name=\"Google Search\" Ctrl=\"no\" Alt=\"yes\" Shift=\"no\" Key=\"113\">https://www.google.com/search?q=$(CURRENT_WORD)</Command>\r\n\
 		<Command name=\"Wikipedia Search\" Ctrl=\"no\" Alt=\"yes\" Shift=\"no\" Key=\"114\">https://en.wikipedia.org/wiki/Special:Search?search=$(CURRENT_WORD)</Command>\r\n\
 		<Command name=\"Open selected file path in new instance\" Ctrl=\"no\" Alt=\"yes\" Shift=\"no\" Key=\"117\">$(NPP_FULL_FILE_PATH) $(CURRENT_WORD) -nosession -multiInst</Command>\r\n\
 	</UserDefinedCommands>\r\n\

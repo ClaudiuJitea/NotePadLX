@@ -378,6 +378,69 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 			return result;
 		}
 
+		case NPPM_GETFILENAMEATCURSOR: // wParam = buffer length, lParam = (wchar_t*)buffer
+		{
+			constexpr int strSize = CURRENTWORD_MAXLENGTH;
+			auto str = std::make_unique<wchar_t[]>(strSize);
+			std::fill_n(str.get(), strSize, L'\0');
+
+			auto CharacterIs = [](wchar_t c, const wchar_t* any) { return c != 0 && std::wcschr(any, c) != nullptr; };
+
+			int hasSlash = 0;
+
+			auto txtW = _pEditView->getSelectedTextToWChar(); // this is either the selected text, or the word under the cursor if there is no selection
+			wcsncpy(str.get(), txtW.c_str(), strSize - 1);
+
+			hasSlash = FALSE;
+			for (int i = 0; str[i] != 0; i++)
+				if (CharacterIs(str[i], L"\\/"))
+					hasSlash = TRUE;
+
+			if (hasSlash == FALSE)
+			{
+				// it's not a full file name so try to find the beginning and ending of it
+				intptr_t start = 0;
+				intptr_t end = 0;
+				const wchar_t *delimiters;
+				auto strLine = std::make_unique<wchar_t[]>(strSize);
+				std::fill_n(strLine.get(), strSize, L'\0');
+
+				size_t lineNumber = 0;
+				intptr_t col = 0;
+
+				lineNumber = _pEditView->getCurrentLineNumber();
+				col = _pEditView->execute(SCI_GETCURRENTPOS) - _pEditView->execute(SCI_POSITIONFROMLINE, lineNumber);
+				_pEditView->getLine(lineNumber, strLine.get(), strSize);
+
+				// find the start
+				start = col;
+				delimiters = L" \t[(\"<>";
+				while ((start > 0) && (CharacterIs(strLine[start], delimiters) == FALSE))
+					start--;
+
+				if (CharacterIs(strLine[start], delimiters)) start++;
+
+				// find the end
+				end = col;
+				delimiters = L" \t:()[]<>\"\r\n";
+				while ((strLine[end] != 0) && (CharacterIs(strLine[end], delimiters) == FALSE)) end++;
+
+				wcsncpy(str.get(), &strLine[start], static_cast<size_t>(end - start));
+				str[end - start] = L'\0';
+			}
+
+			if (static_cast<int>(wcslen(str.get())) >= int(wParam))	//buffer too small
+			{
+				return FALSE;
+			}
+			else //buffer large enough, perform safe copy
+			{
+				wchar_t* pTchar = reinterpret_cast<wchar_t*>(lParam);
+				wcsncpy(pTchar, str.get(), wParam);
+				return TRUE;
+			}
+		}
+
 		case NPPM_GETNPPFULLFILEPATH:
 		case NPPM_GETNPPDIRECTORY:
 		{

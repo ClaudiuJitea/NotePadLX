@@ -36,6 +36,7 @@
 #include "ScintillaEditView.h"
 #include "FindReplaceDlg.h"
 #include "FindReplaceDlg_rc.h"
+#include "AboutDlg.h"
 #include "columnEditor.h"
 #include "columnEditor_rc.h"
 #include "localization.h"
@@ -212,6 +213,16 @@ private slots:
 		QTest::qWait(100);
 		save(col->grab(), "column-editor-dark.png");
 		col->hide();
+	}
+
+	void aboutBox()
+	{
+		_npp->command(IDM_ABOUT);
+		QWidget* about = static_cast<QWidget*>(_npp->getAboutDlg());
+		QVERIFY(about && about->isVisible());
+		QTest::qWait(100);
+		save(about->grab(), "about-dark.png");
+		about->hide();
 	}
 
 	void lightTheme()

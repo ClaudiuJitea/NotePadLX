@@ -86,8 +86,7 @@ namespace
 		switch (id)
 		{
 			case IDM_FILE_OPEN_POWERSHELL: // "Open Containing Folder > PowerShell": the Terminal item covers it
-			case IDM_UPDATE_NPP:           // WinGUp auto-updater: updates come from the package manager
-			case IDM_CONFUPDATERPROXY:
+			case IDM_CONFUPDATERPROXY:     // the WinGUp proxy setting: Qt uses the system proxy
 			case IDM_ONLINEDOCUMENT:       // the Notepad++ user manual and forum: NotePadLX links to its own repository
 			case IDM_FORUM:
 				return true;
@@ -110,6 +109,7 @@ namespace
 			case IDM_HOMESWEETHOME:                        return L"NotePadLX on GitHub";
 			case IDM_PROJECTPAGE:                          return L"Report an Issue";
 			case IDM_ABOUT:                                return L"About NotePadLX";
+			case IDM_UPDATE_NPP:                           return L"Check for &Updates..."; // was "Update Notepad++" (WinGUp)
 			default:                                       return nullptr;
 		}
 	}

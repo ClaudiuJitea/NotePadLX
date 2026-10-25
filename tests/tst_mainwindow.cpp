@@ -155,7 +155,7 @@ private slots:
 	void windowsOnlyItemsAreRemoved()
 	{
 		// NPLX: Windows-only commands are not in the menus (no Linux equivalent)
-		for (int id : { IDM_FILE_OPEN_POWERSHELL, IDM_UPDATE_NPP, IDM_CONFUPDATERPROXY, IDM_ONLINEDOCUMENT, IDM_FORUM })
+		for (int id : { IDM_FILE_OPEN_POWERSHELL, IDM_CONFUPDATERPROXY, IDM_ONLINEDOCUMENT, IDM_FORUM })
 			QVERIFY2(!action(id), qPrintable(QString::number(id)));
 
 		// Linux / NotePadLX names
@@ -165,6 +165,7 @@ private slots:
 		QCOMPARE(action(IDM_HOMESWEETHOME)->text(), QStringLiteral("NotePadLX on GitHub"));
 		QCOMPARE(action(IDM_PROJECTPAGE)->text(), QStringLiteral("Report an Issue"));
 		QCOMPARE(action(IDM_ABOUT)->text(), QStringLiteral("About NotePadLX"));
+		QCOMPARE(action(IDM_UPDATE_NPP)->text(), QStringLiteral("Check for &Updates...")); // replaces the WinGUp updater
 		QCOMPARE(QStringLiteral(NPLX_HOMEPAGE_URL), QStringLiteral("https://github.com/ClaudiuJitea/NotePadLX"));
 
 		// no doubled, leading or trailing separators left behind

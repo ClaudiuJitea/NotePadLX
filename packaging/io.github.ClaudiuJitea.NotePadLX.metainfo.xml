@@ -36,6 +36,12 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.3" date="2026-10-25">
+      <description>
+        <p>A new About box, Debug Info and Check for Updates; full screen, Post-It and distraction free modes;
+        Paste HTML/RTF and binary content, Open File and Redact Selection; every Notepad++ default key checked.</p>
+      </description>
+    </release>
     <release version="0.2" date="2026-10-25">
       <description>
         <p>The Shortcut Mapper for menu commands, macros, Run commands and editor keys; the editor keys of

@@ -21,6 +21,12 @@
 #include <QClipboard>
 #include <QCryptographicHash>
 #include <QComboBox>
+#include <QLabel>
+#include <QMimeData>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QStatusBar>
+#include <QToolButton>
 #include <QMenuBar>
 #include <QTemporaryDir>
 
@@ -31,6 +37,7 @@
 #include "QtUiServices.h"
 #include "ScintillaEditView.h"
 #include "localization.h"
+#include "AboutDlg.h"
 #include "columnEditor.h"
 #include "md5Dlgs.h"
 #include "md5Dlgs_rc.h"
@@ -43,7 +50,14 @@ namespace
 	class SilentUiServices : public QtUiServices
 	{
 	public:
-		int messageBox(const std::wstring&, const std::wstring&, unsigned int) override { return IDOK; }
+		int messageBox(const std::wstring& message, const std::wstring&, unsigned int type) override
+		{
+			_lastMessage = message;
+			++_nbMessages;
+			return (type & 0x0F) == MB_YESNO ? IDNO : IDOK;
+		}
+		std::wstring _lastMessage;
+		int _nbMessages = 0;
 		int saveOrNotMultiBox(const std::wstring&, const std::wstring&) override { return IDNO; }
 		std::vector<std::wstring> getOpenFileNames(const std::wstring&, const std::wstring&, const std::wstring&) override { return _filesAnswer; }
 		std::vector<std::wstring> _filesAnswer;
@@ -316,6 +330,170 @@ private slots:
 		QCOMPARE(p._mainChoice, activeNumeric);
 		QVERIFY(p._formatChoice == NumBase::BASE_16_UPPERCASE);
 		QCOMPARE(p._repeatNum, 2);
+	}
+
+	void aboutBoxShowsAllItsText()
+	{
+		_npp->command(IDM_ABOUT);
+		AboutDlg* about = _npp->getAboutDlg();
+		QVERIFY(about && about->isVisible());
+		QCoreApplication::processEvents();
+		// every label fits (the old QMessageBox::about cut the lines on the right)
+		for (QLabel* label : about->findChildren<QLabel*>())
+		{
+			if (label->text().isEmpty() || label->wordWrap())
+				continue;
+			QVERIFY2(label->width() >= label->sizeHint().width(), qPrintable(label->text()));
+		}
+		bool hasVersion = false;
+		for (QLabel* label : about->findChildren<QLabel*>())
+			hasVersion |= label->text().contains(QStringLiteral("NotePadLX " NPLX_VERSION));
+		QVERIFY(hasVersion);
+		auto* licence = about->findChild<QPlainTextEdit*>(QStringLiteral("licenceEdit"));
+		QVERIFY(licence && licence->toPlainText().contains(QStringLiteral("GNU General Public License")));
+		QVERIFY(about->findChild<QPushButton*>(QStringLiteral("checkForUpdates")));
+		screenshot(about, "about.png");
+
+		// Debug Info from the About box
+		about->findChild<QPushButton*>(QStringLiteral("debugInfo"))->click();
+		DebugInfoDlg* debug = _npp->getDebugInfoDlg();
+		QVERIFY(debug && debug->isVisible());
+		const QString info = QString::fromStdWString(debug->debugInfo());
+		for (const char* field : { "NotePadLX v", "Build time:", "Qt:", "Scintilla/Lexilla included:", "Settings:",
+			"OS:", "Platform: offscreen", "Dark Mode:", "Multi-instance Mode:" })
+			QVERIFY2(info.contains(QString::fromLatin1(field)), field);
+		debug->hide();
+		about->hide();
+
+		_npp->command(IDM_CMDLINEARGUMENTS);
+		QVERIFY(_npp->getCmdLineArgsDlg() && _npp->getCmdLineArgsDlg()->isVisible());
+		_npp->getCmdLineArgsDlg()->hide();
+	}
+
+	void checkForUpdates()
+	{
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_UPDATE_NPP));
+		QVERIFY(action(IDM_UPDATE_NPP));
+		QCOMPARE(action(IDM_UPDATE_NPP)->text(), QStringLiteral("Check for &Updates..."));
+		QVERIFY(UpdateChecker::isNewer("v0.10", "0.2"));
+		QVERIFY(UpdateChecker::isNewer("0.2.1", "0.2"));
+		QVERIFY(!UpdateChecker::isNewer("v0.2", "0.2"));
+		QVERIFY(!UpdateChecker::isNewer("0.1", "0.2"));
+		QVERIFY(!UpdateChecker::isNewer("garbage", "0.2"));
+
+		// the GitHub "latest release" answer, from a file
+		auto latest = [this](const char* tag) {
+			const QString path = _tmp.path() + "/latest.json";
+			QFile f(path);
+			f.open(QIODevice::WriteOnly);
+			f.write(QByteArray("{\"tag_name\": \"") + tag + "\", \"html_url\": \"https://github.com/ClaudiuJitea/NotePadLX/releases/tag/" + tag + "\"}");
+			f.close();
+			::setenv("NPLX_UPDATE_URL", QUrl::fromLocalFile(path).toString().toUtf8().constData(), 1);
+		};
+
+		latest("v99.0");
+		int nb = _ui._nbMessages;
+		_npp->command(IDM_UPDATE_NPP);
+		QTRY_COMPARE(_ui._nbMessages, nb + 1);
+		QVERIFY(QString::fromStdWString(_ui._lastMessage).contains(QStringLiteral("NotePadLX 99.0 is available")));
+
+		latest("v" NPLX_VERSION);
+		nb = _ui._nbMessages;
+		_npp->command(IDM_UPDATE_NPP);
+		QTRY_COMPARE(_ui._nbMessages, nb + 1);
+		QVERIFY(QString::fromStdWString(_ui._lastMessage).contains(QStringLiteral("is the latest version")));
+
+		::setenv("NPLX_UPDATE_URL", QUrl::fromLocalFile(_tmp.path() + "/missing.json").toString().toUtf8().constData(), 1);
+		nb = _ui._nbMessages;
+		_npp->command(IDM_UPDATE_NPP);
+		QTRY_COMPARE(_ui._nbMessages, nb + 1);
+		QVERIFY(QString::fromStdWString(_ui._lastMessage).contains(QStringLiteral("could not be checked")));
+		::unsetenv("NPLX_UPDATE_URL");
+	}
+
+	void editOnSelectionAndPasteSpecial()
+	{
+		_npp->command(IDM_FILE_NEW);
+
+		// Redact Selection: every character but the line ends
+		view()->setText("secret\nkey");
+		view()->execute(SCI_SETSEL, 0, 10);
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_EDIT_REDACT_SELECTION));
+		_npp->command(IDM_EDIT_REDACT_SELECTION);
+		QCOMPARE(text(), QStringLiteral("██████\n███"));
+
+		// Copy / Paste Binary Content keeps the NUL bytes
+		const char bin[] = { 'a', '\0', 'b' };
+		view()->execute(SCI_CLEARALL);
+		view()->execute(SCI_ADDTEXT, 3, reinterpret_cast<sptr_t>(bin));
+		view()->execute(SCI_SELECTALL);
+		_npp->command(IDM_EDIT_COPY_BINARY);
+		view()->execute(SCI_DOCUMENTEND);
+		_npp->command(IDM_EDIT_PASTE_BINARY);
+		QCOMPARE(view()->execute(SCI_GETLENGTH), 6);
+		QCOMPARE(static_cast<char>(view()->execute(SCI_GETCHARAT, 4)), '\0');
+
+		// Paste HTML Content: the HTML source
+		auto* mime = new QMimeData;
+		mime->setHtml(QStringLiteral("<b>bold</b>"));
+		QGuiApplication::clipboard()->setMimeData(mime);
+		view()->execute(SCI_CLEARALL);
+		_npp->command(IDM_EDIT_PASTE_AS_HTML);
+		QVERIFY(text().contains(QStringLiteral("<b>bold</b>")));
+
+		// Open File: the file name under the caret, relative to the document's folder
+		const QString dir = _tmp.path() + "/open";
+		QDir().mkpath(dir);
+		const QString target = dir + "/target.txt";
+		const QString source = dir + "/source.txt";
+		for (const QString& f : { target, source })
+		{
+			QFile file(f);
+			QVERIFY(file.open(QIODevice::WriteOnly));
+			file.write(f == source ? "see target.txt here\n" : "the target\n");
+		}
+		_npp->switchToFile(_npp->doOpen(source.toStdWString()));
+		view()->execute(SCI_GOTOPOS, 6); // in "target.txt"
+		_npp->command(IDM_EDIT_OPENSELECTEDFILETOEDIT);
+		QCOMPARE(QString::fromStdWString(view()->getCurrentBuffer()->getFullPathName()), target);
+	}
+
+	void fullScreenPostItDistractionFree()
+	{
+		_npp->command(IDM_FILE_NEW);
+		for (int id : { IDM_VIEW_FULLSCREENTOGGLE, IDM_VIEW_POSTIT, IDM_VIEW_DISTRACTIONFREE })
+			QVERIFY(Notepad_plus::isCommandPorted(id));
+
+		_npp->command(IDM_VIEW_FULLSCREENTOGGLE);
+		QVERIFY(_npp->specialView()._isFullScreen);
+		QVERIFY(_npp->isFullScreen());
+		QVERIFY(!_npp->menuBar()->isVisible());
+		QVERIFY(_npp->restoreButton() && _npp->restoreButton()->isVisible());
+		_npp->restoreButton()->click(); // the restore button leaves the mode
+		QVERIFY(!_npp->specialView()._isFullScreen);
+		QVERIFY(_npp->menuBar()->isVisible());
+		QVERIFY(!_npp->restoreButton()->isVisible());
+
+		_npp->command(IDM_VIEW_POSTIT);
+		QVERIFY(_npp->specialView()._isPostIt);
+		QVERIFY(_npp->windowFlags() & Qt::FramelessWindowHint);
+		QVERIFY(!_npp->statusBar()->isVisible());
+		QVERIFY(!_npp->menuBar()->isVisible());
+		_npp->command(IDM_VIEW_POSTIT);
+		QVERIFY(!(_npp->windowFlags() & Qt::FramelessWindowHint));
+		QVERIFY(_npp->statusBar()->isVisible());
+		QVERIFY(_npp->menuBar()->isVisible());
+
+		// Distraction Free: full screen + post-it + side padding; F11 / F12 do nothing meanwhile
+		_npp->command(IDM_VIEW_DISTRACTIONFREE);
+		QVERIFY(_npp->specialView()._isDistractionFree && _npp->specialView()._isFullScreen && _npp->specialView()._isPostIt);
+		QVERIFY(view()->execute(SCI_GETMARGINLEFT) > 0);
+		_npp->command(IDM_VIEW_FULLSCREENTOGGLE);
+		QVERIFY(_npp->specialView()._isFullScreen);
+		_npp->command(IDM_VIEW_DISTRACTIONFREE);
+		QVERIFY(!_npp->specialView()._isDistractionFree && !_npp->specialView()._isFullScreen && !_npp->specialView()._isPostIt);
+		QCOMPARE(view()->execute(SCI_GETMARGINLEFT), static_cast<intptr_t>(NppParameters::getInstance().getSVP()._paddingLeft));
+		QVERIFY(_npp->menuBar()->isVisible());
 	}
 };
 

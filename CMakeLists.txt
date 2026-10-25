@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(NotePadLX
-    VERSION 0.2
+    VERSION 0.3
     DESCRIPTION "Linux port of Notepad++"
     HOMEPAGE_URL "https://github.com/ClaudiuJitea/NotePadLX"
     LANGUAGES C CXX)
