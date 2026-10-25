@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=NotePadLX
+GenericName=Text Editor
+Comment=Source code editor, a Linux port of Notepad++
+Exec=notepadlx %F
+Icon=notepadlx
+Terminal=false
+Categories=Development;TextEditor;
+Keywords=text;editor;code;notepad;notepad++;
+StartupNotify=true
+StartupWMClass=notepadlx
+MimeType=text/plain;text/x-c;text/x-c++;text/x-csrc;text/x-chdr;text/x-c++src;text/x-c++hdr;text/x-python;text/x-shellscript;text/x-makefile;text/x-cmake;text/x-java;text/x-csharp;text/x-go;text/x-rust;text/x-lua;text/x-perl;text/x-php;text/x-ruby;text/x-sql;text/x-tex;text/x-markdown;text/markdown;text/html;text/css;text/xml;application/xml;application/json;application/javascript;text/javascript;application/x-yaml;text/x-yaml;text/x-ini;text/x-log;application/x-shellscript;

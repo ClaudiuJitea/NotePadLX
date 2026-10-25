@@ -1,0 +1,46 @@
+.TH NOTEPADLX 1 "2026-10-25" "NotePadLX 0.1" "User Commands"
+.SH NAME
+notepadlx \- source code editor, a Linux port of Notepad++
+.SH SYNOPSIS
+.B notepadlx
+[\fIoptions\fR] [\fIfile\fR...]
+.SH DESCRIPTION
+NotePadLX is a Qt 6 port of the Notepad++ text and source code editor. It uses the
+Scintilla editing component and the Lexilla lexers, reads Notepad++ themes and configuration
+files, and supports syntax highlighting, folding, Find in Files, macros and more.
+.SH OPTIONS
+The Notepad++ command line options are supported, for example:
+.TP
+.B \-multiInst
+Start another instance instead of opening the files in the running one.
+.TP
+.B \-nosession
+Do not restore the previous session and do not save it at exit.
+.TP
+.BI \-n line
+Go to the given line.
+.TP
+.BI \-c column
+Go to the given column.
+.TP
+.BI \-l language
+Open the files with the given language, for example \fB\-lpython\fR.
+.TP
+.B \-ro
+Open the files read-only.
+.TP
+.B \-openFoldersAsWorkspace
+Open the given folders in the Folder as Workspace panel.
+.SH FILES
+.TP
+.I ~/.config/notepadlx/
+The user settings: config.xml, shortcuts.xml, stylers.xml, session.xml and the themes.
+.TP
+.I /usr/share/notepadlx/
+The default settings, themes, languages and localization files.
+.SH ENVIRONMENT
+.TP
+.B NPLX_THEME
+\fBlight\fR or \fBdark\fR overrides the interface theme.
+.SH SEE ALSO
+https://github.com/ClaudiuJitea/NotePadLX

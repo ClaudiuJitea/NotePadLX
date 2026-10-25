@@ -1,0 +1,10 @@
+# build trees
+/build/
+/build-*/
+# release packages (attach them to a GitHub release instead)
+/dist/
+# editors
+.vscode/
+.idea/
+*.user
+__pycache__/

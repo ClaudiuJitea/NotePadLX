@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  NotePadLX defaults, copied to <user config>/config.xml on the first run (upstream config.model.xml).
+  Settings that are not here keep the upstream Notepad++ defaults.
+  NotePadLX differs from upstream on:
+  - DarkMode: enabled, with the Solarized theme (upstream: light, stylers.xml);
+  - Backup: no session snapshot, so closing with unsaved changes asks to save (upstream: snapshot mode).
+-->
+<NotepadPlus>
+    <GUIConfigs>
+        <GUIConfig name="Backup" action="0" useCustumDir="no" dir="" isSnapshotMode="no" snapshotBackupTiming="7000" />
+        <GUIConfig name="DarkMode" enable="yes" colorTone="0" customColorTop="2105376" customColorMenuHotTrack="4539717" customColorActive="3684408" customColorMain="2105376" customColorError="176" customColorText="14737632" customColorDarkText="12632256" customColorDisabledText="8421504" customColorLinkText="65535" customColorEdge="6579300" customColorHotEdge="10197915" customColorDisabledEdge="4737096" enableWindowsMode="no" darkThemeName="Solarized.xml" darkToolBarIconSet="0" darkTbFluentColor="0" darkTbFluentCustomColor="0" darkTbFluentMono="no" darkTabIconSet="2" darkTabUseTheme="no" lightThemeName="" lightToolBarIconSet="4" lightTbFluentColor="0" lightTbFluentCustomColor="0" lightTbFluentMono="no" lightTabIconSet="0" lightTabUseTheme="yes" />
+    </GUIConfigs>
+</NotepadPlus>

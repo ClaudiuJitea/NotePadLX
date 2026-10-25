@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.ClaudiuJitea.NotePadLX</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+  <name>NotePadLX</name>
+  <summary>Source code editor, a Linux port of Notepad++</summary>
+  <developer id="io.github.claudiujitea">
+    <name>Claudiu Jitea</name>
+  </developer>
+  <description>
+    <p>
+      NotePadLX brings Notepad++ to Linux as a native Qt 6 application, ported from the Notepad++ sources.
+      It keeps the Notepad++ editing engine (Scintilla and Lexilla), its themes and its configuration files.
+    </p>
+    <ul>
+      <li>Syntax highlighting and folding for more than 80 languages, plus user defined languages</li>
+      <li>Notepad++ themes, with Solarized as the default dark theme</li>
+      <li>Find and Replace, Find in Files, Mark, the Finder, regular expressions</li>
+      <li>Macro recording and playback, the Run menu</li>
+      <li>Function list, document map, document list, folder as workspace, project panels</li>
+      <li>Column editor, MD5 and SHA hashes, multi-selection and column mode</li>
+    </ul>
+  </description>
+  <launchable type="desktop-id">notepadlx.desktop</launchable>
+  <url type="homepage">https://github.com/ClaudiuJitea/NotePadLX</url>
+  <url type="bugtracker">https://github.com/ClaudiuJitea/NotePadLX/issues</url>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Editing C++ with the Solarized theme, the function list and the document map</caption>
+      <image>https://raw.githubusercontent.com/ClaudiuJitea/NotePadLX/main/docs/screenshots/main-dark.png</image>
+    </screenshot>
+  </screenshots>
+  <content_rating type="oars-1.1"/>
+  <provides>
+    <binary>notepadlx</binary>
+  </provides>
+  <releases>
+    <release version="0.1" date="2026-10-25">
+      <description>
+        <p>First public version: the main window, files and sessions, search, languages and styling, the docking
+        panels, macros, the Run menu, the column editor and the hash tools.</p>
+      </description>
+    </release>
+  </releases>
+</component>
