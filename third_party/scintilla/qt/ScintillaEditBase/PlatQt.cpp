@@ -956,9 +956,11 @@ void Window::SetPositionRelative(PRectangle rc, const Window *relativeTo)
 
 PRectangle Window::GetClientPosition() const
 {
-	// The client position is the window position
+	// NPLX: the client area starts at 0,0, as Win32 GetClientRect. The window position is the viewport's position in
+	// the scroll area, 1,1 with a frame: the text area then started 1 pixel right of the margins, which left the
+	// first pixel column unpainted (a caret at the start of a line stayed on the screen instead of blinking)
 	const qreal scale = ScaleToMultiply(wid);
-	const PRectangle rc = GetPosition();
+	const PRectangle rc = wid ? PRectFromQRect(QRect(QPoint(0, 0), window(wid)->size())) : GetPosition();
 	return rc * scale;
 }
 

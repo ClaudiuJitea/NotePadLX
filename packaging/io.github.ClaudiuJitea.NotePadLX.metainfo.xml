@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.4" date="2026-10-25">
+      <description>
+        <p>The caret blinks at the start of a line: the editor's first pixel column of text is painted again.</p>
+      </description>
+    </release>
     <release version="0.3" date="2026-10-25">
       <description>
         <p>A new About box, Debug Info and Check for Updates; full screen, Post-It and distraction free modes;

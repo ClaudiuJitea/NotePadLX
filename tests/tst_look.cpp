@@ -229,6 +229,31 @@ private slots:
 		QVERIFY(!qApp->style()->standardIcon(QStyle::SP_MessageBoxQuestion).isNull());
 	}
 
+	void caretBlinksAtLineStart()
+	{
+		// the first pixel column of the text is painted (the editor has a frame), so that a caret there is erased when
+		// it blinks off
+		ScintillaEditView* view = _npp->getActiveEditView();
+		view->setFocus();
+		view->execute(SCI_GOTOPOS, 0);
+		const int x = static_cast<int>(view->execute(SCI_POINTXFROMPOSITION, 0, 0));
+		const int y = static_cast<int>(view->execute(SCI_POINTYFROMPOSITION, 0, 0)) + 2;
+		const long sciCaret = static_cast<long>(view->execute(SCI_GETELEMENTCOLOUR, SC_ELEMENT_CARET));
+		const QColor caret(sciCaret & 0xff, (sciCaret >> 8) & 0xff, (sciCaret >> 16) & 0xff);
+		const long sciBack = static_cast<long>(view->execute(SCI_GETELEMENTCOLOUR, SC_ELEMENT_CARET_LINE_BACK));
+		const QColor caretLine(sciBack & 0xff, (sciBack >> 8) & 0xff, (sciBack >> 16) & 0xff);
+		bool on = false;
+		bool off = false;
+		for (int i = 0; i < 20 && !(on && off); ++i)
+		{
+			const QColor pixel = view->viewport()->grab().toImage().pixelColor(x, y);
+			QVERIFY2(pixel == caret || pixel == caretLine, qPrintable(pixel.name()));
+			(pixel == caret ? on : off) = true;
+			QTest::qWait(100);
+		}
+		QVERIFY(on && off);
+	}
+
 	void screenshotsLight()
 	{
 		setTheme("light");

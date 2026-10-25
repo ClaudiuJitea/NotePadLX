@@ -14,9 +14,19 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 7. Dialogs and tools | 🚧 In progress: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper done; Preferences next |
 | 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.3); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.4); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.3** (2026‑10‑25): sessions 10–11 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.4** (2026‑10‑25): sessions 10–12 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 12 (2026‑10‑25): version 0.4 — the caret at the start of a line
+
+- **Caret:** at the start of a line the caret did not blink. Scintilla's Qt `Window::GetClientPosition` returned the
+  viewport's geometry in the scroll area, which is 1,1 when the editor has a frame (`borderEdge`): the text area
+  began 1 pixel right of the margins and the first pixel column of text was never painted, so the caret drawn
+  there stayed on the screen. The client area now starts at 0,0, as Win32 `GetClientRect` (`// NPLX:` in
+  `third_party/scintilla/qt/ScintillaEditBase/PlatQt.cpp`). Test: `tst_look caretBlinksAtLineStart`.
+- **Keys:** a report that no shortcut works could not be reproduced (GNOME Wayland with and without IBus, the
+  user's configuration and session, `.deb` and AppImage: the keys reach their commands). Being investigated.
 
 ## Session 11 (2026‑10‑25): version 0.3 — About, updates, keys, Edit and View commands
 
