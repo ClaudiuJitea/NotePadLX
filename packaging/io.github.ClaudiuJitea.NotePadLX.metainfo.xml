@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.6" date="2026-10-25">
+      <description>
+        <p>Settings &gt; Preferences: the 23 pages of Notepad++, applied at once (tab bar, toolbar icons and colours, dark mode tones, editing, margins, languages, default directory and more). The Find dialog keeps one layout for all its tabs.</p>
+      </description>
+    </release>
     <release version="0.5" date="2026-10-25">
       <description>
         <p>The editor keys work again: Duplicate Line (Ctrl+D), Cut / Delete Line, Select All, Copy, Cut, Paste, Undo and Redo.</p>

@@ -14,11 +14,11 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 7. Dialogs and tools | 🚧 Mostly done: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages); Edit Popup ContextMenu, style theme import, Find characters in range next |
 | 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.5); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.6); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.5** (2026‑10‑25): sessions 10–13 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.6** (2026‑10‑25): sessions 10–14 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
 
-## Session 14 (2026‑10‑25): the Find dialog layout, Settings › Preferences
+## Session 14 (2026‑10‑25): version 0.6 — the Find dialog layout, Settings › Preferences
 
 - **Find dialog:** the tabs keep one layout, as upstream IDD_FIND_REPLACE_DLG (one fixed-size dialog whose tabs only
   hide controls). Hidden controls keep their place, controls of different tabs share a grid cell (Filters/Directory
