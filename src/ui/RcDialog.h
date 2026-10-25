@@ -39,7 +39,8 @@ enum RcStyle : unsigned
 	RcNumber = 1u << 10, RcPassword = 1u << 11, RcCenter = 1u << 12, RcRight = 1u << 13, RcWantReturn = 1u << 14,
 	RcVCenter = 1u << 15, RcNotify = 1u << 16, RcSunken = 1u << 17, RcEtchedLine = 1u << 18, RcDropDownList = 1u << 19,
 	RcDropDown = 1u << 20, RcSort = 1u << 21, RcVScroll = 1u << 22, RcHScroll = 1u << 23, RcDisabled = 1u << 24,
-	RcVertical = 1u << 25, RcReport = 1u << 26, RcLeftText = 1u << 27, RcHidden = 1u << 28
+	RcVertical = 1u << 25, RcReport = 1u << 26, RcLeftText = 1u << 27, RcHidden = 1u << 28,
+	RcGroupStart = 1u << 29 // WS_GROUP: a radio button starts a new group
 };
 
 struct RcControlDef

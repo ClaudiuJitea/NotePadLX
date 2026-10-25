@@ -154,6 +154,11 @@ add_library(nplx_ui STATIC
     ui/md5Dlgs.h
     ui/md5Dlgs_rc.h
     ui/RcHashDialogs.inc
+    ui/NppPreferences.cpp
+    ui/preferenceDlg.cpp
+    ui/preferenceDlg.h
+    ui/preference_rc.h
+    ui/RcPreference.inc
     ui/ShortcutDlg.h
     ui/shortcutRc.h
 )

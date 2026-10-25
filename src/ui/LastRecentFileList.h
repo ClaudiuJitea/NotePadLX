@@ -83,6 +83,9 @@ public:
 		_locked = lock;
 	}
 
+	// upstream switchMode: between the File menu and the "Recent Files" sub-menu (updateMenu rebuilds the items)
+	void switchMode() { _isSubMenuMode = !_isSubMenuMode; }
+
 	bool isSubMenuMode() const {
 		return _isSubMenuMode;
 	}

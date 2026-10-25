@@ -112,8 +112,55 @@ namespace
 		return t;
 	}
 
+	// upstream dark mode tones (Preferences > Dark Mode): the colours of NppDarkMode::Colors on the NotePadLX dark
+	// palette; the black tone is the NotePadLX palette itself
+	Tokens tonedDarkTokens()
+	{
+		Tokens t = darkTokens();
+		const DarkModeConf& darkMode = NppParameters::getInstance().getNppGUI()._darkmode;
+		if (darkMode._colorTone == NppDarkMode::blackTone)
+			return t;
+		const NppDarkMode::Colors c = (darkMode._colorTone == NppDarkMode::customizedTone)
+			? darkMode._customColors : NppDarkMode::getDarkModeDefaultColors(darkMode._colorTone);
+		auto q = [](COLORREF rgb) { return QColor(GetRValue(rgb), GetGValue(rgb), GetBValue(rgb)); };
+		t._base = q(c.background);
+		t._alt = q(c.softerBackground);
+		t._button = q(c.softerBackground);
+		t._hover = q(c.hotBackground);
+		t._pressed = q(c.hotBackground).lighter(115);
+		t._window = q(c.pureBackground);
+		t._menu = q(c.softerBackground);
+		t._menuHover = q(c.hotBackground);
+		t._tooltip = q(c.softerBackground);
+		t._text = q(c.text);
+		t._tooltipText = q(c.text);
+		t._iconFg = q(c.text);
+		t._muted = q(c.darkerText);
+		t._iconMuted = q(c.darkerText);
+		t._disabled = q(c.disabledText);
+		t._border = q(c.edge);
+		t._borderSoft = q(c.disabledEdge);
+		t._borderStrong = q(c.hotEdge);
+		t._menuBorder = q(c.edge);
+		t._dangerSoft = q(c.errorBackground);
+		t._scrollHandle = q(c.edge);
+		t._scrollHandleHover = q(c.hotEdge);
+		return t;
+	}
+
 	Tokens g_tokens = lightTokens();
 	quint64 g_generation = 0; // bumped on theme change: part of the icon cache keys
+
+	// the toolbar icons (Preferences > Toolbar): upstream Fluent colorization and the "filled" sets
+	struct ToolbarIconStyle
+	{
+		QColor _tint;       // invalid: the theme colours
+		bool _mono = false; // the whole icon in the tint (upstream "Complete"), else only its accents ("Partial")
+		bool _bold = false; // thicker strokes (upstream "Filled Fluent UI" sets)
+	};
+	ToolbarIconStyle g_toolbarStyle;
+
+	enum class IconKind { Plain, Toolbar, TabAlternate };
 
 	bool schemeIsDark()
 	{
@@ -140,10 +187,32 @@ namespace
 		return *it;
 	}
 
-	QByteArray colourize(QByteArray svg, const Tokens& t, bool disabled, const QColor& fgOverride = QColor())
+	QByteArray colourize(QByteArray svg, const Tokens& t, bool disabled, const QColor& fgOverride = QColor(),
+		IconKind kind = IconKind::Plain)
 	{
 		auto hex = [](const QColor& c) { return c.name(QColor::HexRgb).toLatin1(); };
-		const QColor fg = fgOverride.isValid() ? fgOverride : t._iconFg;
+		QColor fg = fgOverride.isValid() ? fgOverride : t._iconFg;
+		QColor muted = t._iconMuted;
+		QColor accent = t._iconAccent;
+		QColor warn = t._warn;
+		if (kind == IconKind::Toolbar)
+		{
+			if (g_toolbarStyle._tint.isValid())
+			{
+				accent = g_toolbarStyle._tint;
+				if (g_toolbarStyle._mono)
+					fg = muted = g_toolbarStyle._tint;
+			}
+			if (g_toolbarStyle._bold)
+				svg.replace("stroke-width=\"1.75\"", "stroke-width=\"2.25\"");
+		}
+		else if (kind == IconKind::TabAlternate)
+		{
+			// upstream alternate tab icons: coloured documents
+			muted = t._iconAccent;
+			warn = t._danger;
+		}
+
 		if (disabled)
 		{
 			const QByteArray d = hex(t._disabled);
@@ -153,10 +222,10 @@ namespace
 		else
 		{
 			svg.replace("@fg", hex(fg));
-			svg.replace("@muted", hex(t._iconMuted));
-			svg.replace("@accent", hex(t._iconAccent));
+			svg.replace("@muted", hex(muted));
+			svg.replace("@accent", hex(accent));
 			svg.replace("@danger", hex(t._danger));
-			svg.replace("@warn", hex(t._warn));
+			svg.replace("@warn", hex(warn));
 		}
 		svg.replace("@bg", hex(t._base));
 		return svg;
@@ -176,7 +245,7 @@ namespace
 	class NplxIconEngine : public QIconEngine
 	{
 	public:
-		explicit NplxIconEngine(const QString& name) : _name(name) {}
+		explicit NplxIconEngine(const QString& name, IconKind kind = IconKind::Plain) : _name(name), _kind(kind) {}
 
 		QPixmap pixmap(const QSize& size, QIcon::Mode mode, QIcon::State state) override
 		{
@@ -187,12 +256,12 @@ namespace
 		{
 			const QSize pixelSize = size * scale;
 			const bool disabled = (mode == QIcon::Disabled);
-			const QString key = QStringLiteral("nplx:%1:%2:%3x%4:%5").arg(_name).arg(int(disabled))
-				.arg(pixelSize.width()).arg(pixelSize.height()).arg(g_generation);
+			const QString key = QStringLiteral("nplx:%1:%2:%3x%4:%5:%6").arg(_name).arg(int(disabled))
+				.arg(pixelSize.width()).arg(pixelSize.height()).arg(g_generation).arg(int(_kind));
 			QPixmap pm;
 			if (!QPixmapCache::find(key, &pm))
 			{
-				const QImage img = renderSvg(colourize(iconTemplate(_name), g_tokens, disabled), pixelSize);
+				const QImage img = renderSvg(colourize(iconTemplate(_name), g_tokens, disabled, QColor(), _kind), pixelSize);
 				pm = QPixmap::fromImage(img);
 				QPixmapCache::insert(key, pm);
 			}
@@ -213,10 +282,11 @@ namespace
 		}
 		bool isNull() override { return iconTemplate(_name).isEmpty(); }
 		QString key() const override { return QStringLiteral("nplx"); }
-		QIconEngine* clone() const override { return new NplxIconEngine(_name); }
+		QIconEngine* clone() const override { return new NplxIconEngine(_name, _kind); }
 
 	private:
 		QString _name;
+		IconKind _kind = IconKind::Plain;
 	};
 
 	// --- stylesheet images: the templates written, coloured, to the cache folder (QSS needs file names)
@@ -359,7 +429,7 @@ namespace
 
 	void applyTheme(QApplication& app)
 	{
-		g_tokens = schemeIsDark() ? darkTokens() : lightTokens();
+		g_tokens = schemeIsDark() ? tonedDarkTokens() : lightTokens();
 		++g_generation;
 		QApplication::setPalette(paletteFor(g_tokens));
 		app.setStyleSheet(styleSheet(g_tokens));
@@ -379,6 +449,22 @@ bool isDark()
 QIcon icon(const QString& name)
 {
 	return QIcon(new NplxIconEngine(name));
+}
+
+QIcon toolbarIcon(const QString& name)
+{
+	return QIcon(new NplxIconEngine(name, IconKind::Toolbar));
+}
+
+QIcon tabIcon(const QString& name, bool alternate)
+{
+	return QIcon(new NplxIconEngine(name, alternate ? IconKind::TabAlternate : IconKind::Plain));
+}
+
+void setToolbarIconStyle(const QColor& tint, bool mono, bool bold)
+{
+	g_toolbarStyle = ToolbarIconStyle{ tint, mono, bold };
+	++g_generation; // the icons are drawn again
 }
 
 void initDarkMode()
@@ -502,6 +588,13 @@ QTabBar { background: transparent; }
 QTabBar::tab { background: transparent; color: {muted}; padding: 6px 12px; border: none; border-bottom: 2px solid transparent; }
 QTabBar::tab:hover { background: {hover}; color: {text}; }
 QTabBar::tab:selected { background: {base}; color: {text}; border-bottom: 2px solid {accent}; }
+QTabBar[nplxReduced="false"]::tab { padding: 9px 14px; }
+QTabBar[nplxDrawInactive="true"]::tab:!selected { background: {alt}; }
+QTabBar[nplxDrawInactive="true"]::tab:!selected:hover { background: {hover}; }
+QTabBar[nplxTopBar="false"]::tab:selected { border-bottom-color: transparent; }
+QTabBar::tab:left { border-bottom: none; border-right: 2px solid transparent; }
+QTabBar::tab:left:selected { border-right: 2px solid {accent}; }
+QTabBar[nplxTopBar="false"]::tab:left:selected { border-right-color: transparent; }
 QTabBar::tab:disabled { color: {disabled}; }
 QTabBar::close-button { image: url({tab_close}); subcontrol-position: right; border-radius: 4px; margin: 2px; }
 QTabBar::close-button:hover { image: url({tab_close_hover}); background: {dangerSoft}; }

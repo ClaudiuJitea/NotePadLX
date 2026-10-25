@@ -11,12 +11,46 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 4. Find / Replace | 🚧 Mostly done (dialog, Finder, Find in Files, Mark, smart highlight; incremental search open) |
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
-| 7. Dialogs and tools | 🚧 In progress: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper done; Preferences next |
+| 7. Dialogs and tools | 🚧 Mostly done: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages); Edit Popup ContextMenu, style theme import, Find characters in range next |
 | 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
 | 9. Plugin API for Linux | ⏳ Planned |
 | 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.5); Flatpak, `.rpm` and CI next |
 
 **Current version: 0.5** (2026‑10‑25): sessions 10–13 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 14 (2026‑10‑25): the Find dialog layout, Settings › Preferences
+
+- **Find dialog:** the tabs keep one layout, as upstream IDD_FIND_REPLACE_DLG (one fixed-size dialog whose tabs only
+  hide controls). Hidden controls keep their place, controls of different tabs share a grid cell (Filters/Directory
+  with Bookmark/Purge, the action buttons per row, the Find in Files options under the buttons), rows have a fixed
+  height (a QGridLayout drops the spacing of a row whose controls are all hidden), Close and Transparency are at the
+  bottom. Test: `tst_findreplace tabsKeepTheLayout`.
+- **Settings › Preferences** (`ui/preferenceDlg.*`, port of upstream `WinControls/Preference/preferenceDlg`):
+  - the 23 pages are RcDialogs built from the upstream `.rc` (`ui/RcPreference.inc`, `ui/preference_rc.h`); their
+    `run_dlgProc` became `initDialog` / `onCommand` / `onSliderChanged`. File Association (Windows registry) is not
+    listed. `tools/gen_rcdialogs.py` now skips `//` comments and keeps `WS_GROUP` (`RcGroupStart`: a radio button
+    starts a new group); `RcDialog::setChecked` can uncheck a radio button (Win32 BM_SETCHECK).
+  - The ~70 NppBigSwitch cases they send are in `ui/NppPreferences.cpp` (`Notepad_plus::preferenceMessage`). NPLX
+    deviation: NPPM_INTERNAL_LINENUMBER / SYMBOLMARGIN follow the setting instead of toggling the margin (upstream
+    hid the line numbers when only the dynamic / constant width changed).
+  - New effects: the tab bar follows `_tabStatus` (`DocTabView::applyTabStatus`: hidden, vertical, reduced, locked,
+    active tab bar, inactive tab colour, close buttons on the active tab or all, double click to close, alternate
+    icons); the menu bar and status bar can be hidden (Alt or F10 shows a hidden menu bar); the toolbar icon sets
+    (small 18 px / large 24 px, the "filled" sets with bolder strokes, the Fluent colours drawn on the NotePadLX
+    icons, "Complete" or "Partial"); the dark mode tones and custom colours on the NotePadLX palette; switching dark
+    mode switches the editor theme (darkThemeName / lightThemeName), as upstream; excluded languages are hidden in the
+    Language menu; Default Directory drives the Open / Save As dialogs; the backup timer follows the snapshot
+    settings; `NppDarkModeOptions.h` ports upstream's per-mode toolbar / tab icon options.
+  - `getNameStrFromCmd` reads the labels from the Qt menu (`g_menuCommandNameResolver` was never set, so command
+    names from the menu were empty).
+  - Not available yet, greyed out with a tooltip: pinned tabs, multi-line tab bar (Qt tab bars have one row), the
+    system tray (Phase 8), the document peeker. Hidden: the rendering mode (DirectWrite) and the WinGUp auto-updater.
+    The interface language is saved and used at the next start (runtime reload is Phase 8); the dialog font is kept in
+    config.xml only (NotePadLX dialogs use the desktop font). Print settings are saved; printing is Phase 8.
+  - Edit › On Selection › Change Search Engine… opens the Search Engine page.
+- **Tests:** `tests/tst_preferences.cpp` (16 cases: the page list, each page shown alone, and the settings reaching
+  the window: status/menu bar, toolbar sizes, tab bar, caret and current line, margins and edges, padding, Language
+  menu items, indentation, recent files, date format, auto-completion, dark mode tone). 17/17 suites pass.
 
 ## Session 13 (2026‑10‑25): version 0.5 — the editor keys
 
@@ -166,7 +200,7 @@ one is planned:
 | Phase | Menu items |
 |---|---|
 | 3/4 leftovers | File › Load Session…, Save Session…; Search › Incremental Search (Ctrl+Alt+I); View › Tab › Apply Color 1–5, Remove Color |
-| 7 | Settings › Preferences…, Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range…; Edit › On Selection › Change Search Engine… (a Preferences page) |
+| 7 | Settings › Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range… |
 | 8 | File › Print… (Ctrl+P), Print Now; View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |

@@ -138,7 +138,7 @@ void RcDialog::buildFrom(const RcDialogDef& def)
 				{
 					auto* radio = new QRadioButton(rcText(c._text), this);
 					radio->setAutoExclusive(false);
-					if (!radioGroup)
+					if (!radioGroup || (c._style & RcGroupStart))
 					{
 						radioGroup = new QButtonGroup(this);
 						radioGroup->setExclusive(true);
@@ -301,7 +301,14 @@ void RcDialog::setChecked(int id, bool checked) const
 	if (auto* b = qobject_cast<QAbstractButton*>(dlgItem(id)))
 	{
 		QSignalBlocker blocker(b);
+		// Win32 BM_SETCHECK also unchecks a radio button, which an exclusive QButtonGroup refuses
+		QButtonGroup* group = b->group();
+		const bool reopen = !checked && group && group->exclusive();
+		if (reopen)
+			group->setExclusive(false);
 		b->setChecked(checked);
+		if (reopen)
+			group->setExclusive(true);
 	}
 }
 

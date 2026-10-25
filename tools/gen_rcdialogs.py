@@ -31,6 +31,7 @@ STYLE_BITS = {
     'CBS_DROPDOWNLIST': 'RcDropDownList', 'CBS_DROPDOWN': 'RcDropDown', 'CBS_SORT': 'RcSort', 'LBS_SORT': 'RcSort',
     'WS_VSCROLL': 'RcVScroll', 'WS_HSCROLL': 'RcHScroll', 'WS_DISABLED': 'RcDisabled', 'TBS_VERT': 'RcVertical',
     'LVS_REPORT': 'RcReport', 'BS_CENTER': 'RcCenter', 'BS_RIGHT': 'RcRight', 'BS_LEFTTEXT': 'RcLeftText',
+    'WS_GROUP': 'RcGroupStart',
 }
 
 
@@ -40,6 +41,9 @@ def tokenize(text):
         c = text[i]
         if c.isspace():
             i += 1
+        elif text.startswith('//', i):  # a comment, to the end of the line
+            while i < n and text[i] != '\n':
+                i += 1
         elif c == ',':
             tokens.append(','); i += 1
         elif c == '"' or (c == 'L' and i + 1 < n and text[i + 1] == '"'):

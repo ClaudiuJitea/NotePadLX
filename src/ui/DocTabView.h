@@ -55,13 +55,26 @@ public:
 
 	ScintillaEditView* getScintillaEditView() const { return _pView; }
 
+	// upstream TabBarPlus settings (NppGUI::_tabStatus, Preferences > Tab Bar): hidden, vertical, reduced, drag and
+	// drop, active tab top bar, inactive tabs, close buttons, double click to close, alternate icons
+	void applyTabStatus();
+
+	// upstream Buffer::refreshCompactFileName: the labels after a change of the label length
+	void refreshLabels();
+
 signals:
 	// The user clicked a tab (upstream: TCN_SELCHANGE handled by Notepad_plus)
 	void bufferSelected(BufferID id);
 	// Close button or middle click (upstream: TCN_TABDELETE)
 	void bufferCloseRequested(BufferID id);
 
+protected:
+	void mouseDoubleClickEvent(QMouseEvent* event) override;
+	void tabInserted(int index) override;
+
 private:
+	void loadIcons(bool alternate);
+	void updateCloseButtons();
 	void updateTab(int index, Buffer* buf);
 	QIcon iconFor(const Buffer* buf) const;
 
@@ -72,4 +85,5 @@ private:
 	QIcon _readOnlyIcon;
 	QIcon _readOnlySysIcon;
 	QIcon _monitoringIcon;
+	bool _isAlternateIcons = false;
 };

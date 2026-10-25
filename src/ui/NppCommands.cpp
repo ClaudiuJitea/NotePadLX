@@ -64,6 +64,7 @@
 #include "ClipboardHistoryPanel.h"
 #include "FunctionListPanel.h"
 #include "GoToLineDlg.h"
+#include "preferenceDlg.h"
 #include "UserDefineDialog.h"
 #include "WordStyleDlg.h"
 #include "Parameters.h"
@@ -506,6 +507,27 @@ void Notepad_plus::command(int id)
 				_runMacroDlg->initMacroList();
 				checkMacroState();
 			}
+			break;
+		}
+
+		case IDM_SETTING_PREFERENCE:
+		{
+			// upstream: _preference.doDialog(isRTL); NPLX: created on first use, with the messages to this window
+			const bool isFirstTime = (_preference == nullptr);
+			if (isFirstTime)
+			{
+				_preference = new PreferenceDlg(this);
+				_preference->init([this](unsigned int message, uptr_t wParam, sptr_t lParam) { return nppMessage(message, wParam, lParam); });
+			}
+			_preference->doDialog(_nativeLangSpeaker.isRTL());
+			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changePreferenceDlgLang(_preference) on first use
+			break;
+		}
+
+		case IDM_EDIT_CHANGESEARCHENGINE:
+		{
+			command(IDM_SETTING_PREFERENCE);
+			_preference->showDialogByName(L"SearchEngine");
 			break;
 		}
 

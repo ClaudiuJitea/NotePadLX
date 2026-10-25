@@ -133,3 +133,10 @@ target_compile_definitions(tst_keys PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT
 target_link_libraries(tst_keys PRIVATE nplx_ui Qt6::Test)
 add_test(NAME keys COMMAND tst_keys)
 set_tests_properties(keys PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_preferences tst_preferences.cpp)
+set_target_properties(tst_preferences PROPERTIES AUTOMOC ON)
+target_compile_definitions(tst_preferences PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT_SOURCE_DIR}/data")
+target_link_libraries(tst_preferences PRIVATE nplx_ui Qt6::Test)
+add_test(NAME preferences COMMAND tst_preferences)
+set_tests_properties(preferences PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -184,7 +184,7 @@ private slots:
 	{
 		auto* toolBar = _npp->findChild<QToolBar*>(QStringLiteral("mainToolBar"));
 		QVERIFY(toolBar);
-		QCOMPARE(toolBar->iconSize(), QSize(24, 24));
+		QCOMPARE(toolBar->iconSize(), QSize(18, 18)); // the default light set: upstream "Standard icons: small"
 		int buttons = 0;
 		for (QAction* a : toolBar->actions())
 		{

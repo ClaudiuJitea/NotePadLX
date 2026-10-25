@@ -49,6 +49,7 @@ class QMenu;
 class QSplitter;
 class DocTabView;
 class FindReplaceDlg;
+class PreferenceDlg;
 class GoToLineDlg;
 class UserDefineDialog;
 class DockingPanel;
@@ -243,6 +244,9 @@ public:
 	// --- search (NppSearch.cpp; upstream Notepad_plus.cpp)
 	// NPLX: upstream Notepad_plus::process() for the messages its children send (::SendMessage(_hParent, ...))
 	intptr_t nppMessage(unsigned int message, uptr_t wParam, sptr_t lParam);
+	// NPLX: the messages of the Preferences dialog (upstream NppBigSwitch cases), in NppPreferences.cpp
+	bool preferenceMessage(unsigned int message, uptr_t wParam, sptr_t lParam, intptr_t& result);
+	PreferenceDlg* getPreferenceDlg() const { return _preference; } // NPLX: tests
 	FindReplaceDlg* getFindReplaceDlg() const { return _findReplaceDlg; } // NPLX
 	GoToLineDlg* getGoToLineDlg() const { return _goToLineDlg; } // NPLX
 	UserDefineDialog* getUserDefineDlg() const { return _userDefineDlg; } // NPLX: upstream ScintillaEditView::getUserDefineDlg()
@@ -421,6 +425,16 @@ private:
 	bool viewVisibleConst(int whichOne) const;
 	void buildMainMenu();
 	void buildToolBar(); // upstream toolBarIcons[] (Notepad_plus.cpp)
+	// upstream ToolBar::reduce / enlarge / reduceToSet2 / enlargeToSet2 / setToBmpIcons and the Fluent colours:
+	// the icon size and style of nppGUI._tbIconInfo
+	void applyToolbarIconSet();
+	void launchDocumentBackupTask(); // upstream: starts the backupDocument thread
+	QString fileDialogDir() const; // Preferences > Default Directory
+	void rememberFileDialogDir(const QString& filePath);
+	void refreshDarkMode(bool resetStyle);
+	void removeAllHotSpot();
+	void hideExcludedLanguages(); // NPLX: upstream removes the excluded languages from the menu at init
+	void showLanguageMenuItem(int cmdID, bool show);
 	void buildLanguageMenu(QMenu* langMenu);
 	void setupEditView(ScintillaEditView* view);
 	void syncZoom();
@@ -454,6 +468,8 @@ private:
 	std::unique_ptr<QtNppMenu> _mainMenuHandle; // NppMenu view of the menu bar (upstream _mainMenuHandle)
 	ContextMenu _tabPopupMenu;
 	FindReplaceDlg* _findReplaceDlg = nullptr;
+	PreferenceDlg* _preference = nullptr; // created on first use (upstream: created by IDM_SETTING_PREFERENCE)
+	bool _altAloneDown = false;           // Alt pressed alone, to show a hidden menu bar
 	RunDlg* _runDlg = nullptr;
 	RunMacroDlg* _runMacroDlg = nullptr;
 	class ShortcutMapper* _pShortcutMapper = nullptr; // upstream: the open Shortcut Mapper (NPPM_INTERNAL_FINDKEYCONFLICTS)

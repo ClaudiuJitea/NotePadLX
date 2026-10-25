@@ -19,6 +19,9 @@
 
 #include "NplxStyle.h"
 
+#include <QBoxLayout>
+#include <QMouseEvent>
+#include <QStyle>
 #include <QVariant>
 
 #include "Parameters.h"
@@ -47,14 +50,10 @@ DocTabView::DocTabView(ScintillaEditView* pView, QWidget* parent)
 	setElideMode(Qt::ElideNone);
 	setSelectionBehaviorOnRemove(QTabBar::SelectRightTab);
 
-	// Tab icons: upstream states (saved, unsaved, read-only, system read-only, monitoring). NPLX: NotePadLX icons
-	_savedIcon = nplx::style::icon(QStringLiteral("tab_saved"));
-	_unsavedIcon = nplx::style::icon(QStringLiteral("tab_unsaved"));
-	_readOnlyIcon = nplx::style::icon(QStringLiteral("tab_readonly"));
-	_readOnlySysIcon = nplx::style::icon(QStringLiteral("tab_readonly_sys"));
-	_monitoringIcon = nplx::style::icon(QStringLiteral("tab_monitoring"));
+	loadIcons(false);
 
 	connect(this, &QTabBar::currentChanged, this, [this](int index) {
+		updateCloseButtons();
 		if (_isSettingBuffer || index < 0)
 			return;
 		emit bufferSelected(getBufferByIndex(static_cast<size_t>(index)));
@@ -62,6 +61,97 @@ DocTabView::DocTabView(ScintillaEditView* pView, QWidget* parent)
 	connect(this, &QTabBar::tabCloseRequested, this, [this](int index) {
 		emit bufferCloseRequested(getBufferByIndex(static_cast<size_t>(index)));
 	});
+}
+
+void DocTabView::loadIcons(bool alternate)
+{
+	// Tab icons: upstream states (saved, unsaved, read-only, system read-only, monitoring). NPLX: NotePadLX icons
+	_isAlternateIcons = alternate;
+	_savedIcon = nplx::style::tabIcon(QStringLiteral("tab_saved"), alternate);
+	_unsavedIcon = nplx::style::tabIcon(QStringLiteral("tab_unsaved"), alternate);
+	_readOnlyIcon = nplx::style::tabIcon(QStringLiteral("tab_readonly"), alternate);
+	_readOnlySysIcon = nplx::style::tabIcon(QStringLiteral("tab_readonly_sys"), alternate);
+	_monitoringIcon = nplx::style::tabIcon(QStringLiteral("tab_monitoring"), alternate);
+}
+
+void DocTabView::applyTabStatus()
+{
+	const int tabStatus = NppParameters::getInstance().getNppGUI()._tabStatus;
+
+	setVisible(!(tabStatus & TAB_HIDE));
+	setMovable(tabStatus & TAB_DRAGNDROP);
+
+	// upstream TabBarPlus::doVertical: the tabs on the left of the view
+	const bool isVertical = tabStatus & TAB_VERTICAL;
+	setShape(isVertical ? QTabBar::RoundedWest : QTabBar::RoundedNorth);
+	if (auto* box = qobject_cast<QBoxLayout*>(parentWidget() ? parentWidget()->layout() : nullptr))
+		box->setDirection(isVertical ? QBoxLayout::LeftToRight : QBoxLayout::TopToBottom);
+
+	// the stylesheet draws the reduced tabs, the top bar of the active tab and the inactive tabs
+	setProperty("nplxReduced", static_cast<bool>(tabStatus & TAB_REDUCE));
+	setProperty("nplxTopBar", static_cast<bool>(tabStatus & TAB_DRAWTOPBAR));
+	setProperty("nplxDrawInactive", static_cast<bool>(tabStatus & TAB_DRAWINACTIVETAB));
+	style()->unpolish(this);
+	style()->polish(this);
+
+	const bool closeButtons = tabStatus & TAB_CLOSEBUTTON;
+	if (closeButtons != tabsClosable())
+		setTabsClosable(closeButtons);
+	updateCloseButtons();
+
+	const bool alternate = tabStatus & TAB_ALTICONS;
+	if (alternate != _isAlternateIcons)
+	{
+		loadIcons(alternate);
+		for (int i = 0; i < count(); ++i)
+			setTabIcon(i, iconFor(MainFileManager.getBufferByID(getBufferByIndex(static_cast<size_t>(i)))));
+	}
+	update();
+}
+
+void DocTabView::refreshLabels()
+{
+	for (int i = 0; i < count(); ++i)
+	{
+		BufferID id = getBufferByIndex(static_cast<size_t>(i));
+		if (id == BUFFER_INVALID)
+			continue;
+		Buffer* buf = MainFileManager.getBufferByID(id);
+		buf->refreshCompactFileName();
+		updateTab(i, buf);
+	}
+}
+
+void DocTabView::updateCloseButtons()
+{
+	// upstream: without "Show close button on each inactive tab", only the active tab has one
+	if (!tabsClosable())
+		return;
+	const bool onInactiveTabs = NppParameters::getInstance().getNppGUI()._tabStatus & TAB_INACTIVETABSHOWBUTTON;
+	const auto side = static_cast<QTabBar::ButtonPosition>(style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, nullptr, this));
+	for (int i = 0; i < count(); ++i)
+	{
+		if (QWidget* button = tabButton(i, side))
+			button->setVisible(onInactiveTabs || i == currentIndex());
+	}
+}
+
+void DocTabView::tabInserted(int index)
+{
+	QTabBar::tabInserted(index);
+	updateCloseButtons();
+}
+
+void DocTabView::mouseDoubleClickEvent(QMouseEvent* event)
+{
+	// upstream TAB_DBCLK2CLOSE: a double click on a tab closes it
+	const int index = tabAt(event->position().toPoint());
+	if (index >= 0 && event->button() == Qt::LeftButton && (NppParameters::getInstance().getNppGUI()._tabStatus & TAB_DBCLK2CLOSE))
+	{
+		emit bufferCloseRequested(getBufferByIndex(static_cast<size_t>(index)));
+		return;
+	}
+	QTabBar::mouseDoubleClickEvent(event);
 }
 
 QIcon DocTabView::iconFor(const Buffer* buf) const

@@ -59,6 +59,16 @@ namespace nplx::style
 	// a NotePadLX icon by name (resources/nplx-icons/<name>.svg), drawn for the current theme
 	QIcon icon(const QString& name);
 
+	// a toolbar icon: drawn with the style of setToolbarIconStyle (Preferences > Toolbar)
+	QIcon toolbarIcon(const QString& name);
+
+	// a document tab icon; the alternate set has coloured documents (Preferences > Tab Bar > Alternate icons)
+	QIcon tabIcon(const QString& name, bool alternate);
+
+	// upstream Fluent colorization: tint (invalid for the theme colours), the whole icon (mono) or its accents, and
+	// thicker strokes for the "filled" sets
+	void setToolbarIconStyle(const QColor& tint, bool mono, bool bold);
+
 	// the stylesheet text for the given tokens (exposed for tests)
 	QString styleSheet(const Tokens& t);
 }

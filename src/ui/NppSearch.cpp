@@ -495,7 +495,12 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 		}
 
 		default:
+		{
+			intptr_t result = FALSE;
+			if (preferenceMessage(message, wParam, lParam, result))
+				return result;
 			break;
+		}
 	}
 	return FALSE;
 }

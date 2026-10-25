@@ -36,6 +36,7 @@
 #include <QFileDialog>
 #include <QFileInfo>
 #include <QLabel>
+#include <QKeyEvent>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSplitter>
@@ -53,6 +54,9 @@
 #include "FunctionListPanel.h"
 #include "GoToLineDlg.h"
 #include "NplxStyle.h"
+#include "NppDarkModeOptions.h"
+#include "shortcut.h"
+#include "preferenceDlg.h"
 #include "UserDefineDialog.h"
 #include "WordStyleDlg.h"
 #include "AutoCompletion.h"
@@ -148,6 +152,7 @@ Notepad_plus::Notepad_plus()
 
 Notepad_plus::~Notepad_plus()
 {
+	g_menuCommandNameResolver = nullptr;
 	delete _smartHighlighter;
 }
 
@@ -420,6 +425,32 @@ void Notepad_plus::init()
 
 	buildMainMenu();
 	buildToolBar();
+	hideExcludedLanguages();
+
+	// upstream getNameStrFromCmd reads the label of a command from the menu (GetMenuString)
+	g_menuCommandNameResolver = [this](unsigned long id) {
+		const QAction* action = actionFor(static_cast<int>(id));
+		if (!action)
+			return std::wstring();
+		QString text = action->text();
+		const qsizetype tab = text.indexOf(QLatin1Char('\t'));
+		return (tab < 0 ? text : text.left(tab)).toStdWString();
+	};
+
+	// upstream: the menu bar, the status bar and the tab bars as the settings say (Preferences > General, Tab Bar)
+	{
+		const NppGUI& gui = nppParam.getNppGUI();
+		menuBar()->setVisible(gui._menuBarShow);
+		statusBar()->setVisible(gui._statusBarShow);
+		_mainDocTab->applyTabStatus();
+		_subDocTab->applyTabStatus();
+	}
+	// upstream: Alt or F10 shows a hidden menu bar until it is used (WM_SYSCOMMAND SC_KEYMENU)
+	qApp->installEventFilter(this);
+	connect(menuBar(), &QMenuBar::triggered, this, [this]() {
+		if (!NppParameters::getInstance().getNppGUI()._menuBarShow)
+			menuBar()->hide();
+	});
 
 	_mainMenuHandle = std::make_unique<QtNppMenu>(menuBar());
 
@@ -514,17 +545,28 @@ void Notepad_plus::init()
 			QMetaObject::invokeMethod(this, [this]() { checkDocStatus(); }, Qt::QueuedConnection);
 	});
 
-	// Snapshot mode: periodic backup of the current document (upstream: backupDocument thread
-	// posting NPPM_INTERNAL_SAVEBACKUP every _snapshotBackupTiming ms)
 	if (nppGUI.isSnapshotMode())
+		launchDocumentBackupTask();
+}
+
+void Notepad_plus::launchDocumentBackupTask()
+{
+	// Snapshot mode: periodic backup of the current document (upstream: backupDocument thread
+	// posting NPPM_INTERNAL_SAVEBACKUP every _snapshotBackupTiming ms). NPLX: also restarts the timer after a change
+	// of the period, and stops it when the snapshot mode is off (Preferences > Backup)
+	const NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+	if (!_backupTimer)
 	{
 		_backupTimer = new QTimer(this);
 		connect(_backupTimer, &QTimer::timeout, this, []() {
 			if (NppParameters::getInstance().getNppGUI().isSnapshotMode())
 				MainFileManager.backupCurrentBuffer();
 		});
-		_backupTimer->start(static_cast<int>(std::max<size_t>(nppGUI._snapshotBackupTiming, 1000)));
 	}
+	if (nppGUI.isSnapshotMode())
+		_backupTimer->start(static_cast<int>(std::max<size_t>(nppGUI._snapshotBackupTiming, 1000)));
+	else
+		_backupTimer->stop();
 }
 
 // ============================================================================
@@ -799,10 +841,9 @@ void Notepad_plus::buildToolBar()
 	_toolBar = addToolBar(tr("Tool Bar"));
 	_toolBar->setObjectName(QStringLiteral("mainToolBar"));
 	_toolBar->setMovable(false);
-	// upstream TB_SMALL / TB_SMALL2 are 16 px, the others 24 px (Fluent); NPLX: 18 / 24
-	const toolBarStatusType tbStatus = NppParameters::getInstance().getNppGUI()._tbIconInfo._tbIconSet;
-	const int iconSize = (tbStatus == TB_SMALL || tbStatus == TB_SMALL2) ? 18 : 24;
-	_toolBar->setIconSize(QSize(iconSize, iconSize));
+	// upstream Notepad_plus::init: the icons of the current mode (dark or light)
+	NppParameters::getInstance().getNppGUI()._tbIconInfo = NppDarkMode::getToolbarIconInfo();
+	applyToolbarIconSet();
 
 	for (const ToolBarButton& b : toolBarIcons)
 	{
@@ -815,7 +856,7 @@ void Notepad_plus::buildToolBar()
 		if (!action)
 			continue;
 
-		action->setIcon(nplx::style::icon(QString::fromLatin1(b._icon)));
+		action->setIcon(nplx::style::toolbarIcon(QString::fromLatin1(b._icon)));
 		action->setIconVisibleInMenu(false); // upstream menus have no icons
 		_toolBar->addAction(action);
 	}
@@ -2248,6 +2289,32 @@ void Notepad_plus::onScintillaNotify(Scintilla::NotificationData* scnData)
 
 bool Notepad_plus::eventFilter(QObject* watched, QEvent* event)
 {
+	// upstream SC_KEYMENU with a hidden menu bar (Preferences > General > Menu > Hide): Alt alone or F10 shows it
+	// until a command is chosen or the key is pressed again. Only the events of this window's focus widget count
+	// (the application filter sees a key event again for each parent it is passed to)
+	if ((event->type() == QEvent::KeyPress || event->type() == QEvent::KeyRelease) && !NppParameters::getInstance().getNppGUI()._menuBarShow
+		&& watched == QApplication::focusWidget() && QApplication::activeWindow() == this)
+	{
+		auto* keyEvent = static_cast<QKeyEvent*>(event);
+		const bool isAlt = keyEvent->key() == Qt::Key_Alt && !(keyEvent->modifiers() & ~Qt::AltModifier);
+		if (event->type() == QEvent::KeyPress)
+		{
+			_altAloneDown = isAlt && !keyEvent->isAutoRepeat();
+			if (keyEvent->key() == Qt::Key_F10 && keyEvent->modifiers() == Qt::NoModifier)
+			{
+				menuBar()->setVisible(!menuBar()->isVisible());
+				return true;
+			}
+		}
+		else if (isAlt && _altAloneDown)
+		{
+			_altAloneDown = false;
+			menuBar()->setVisible(!menuBar()->isVisible());
+			if (menuBar()->isVisible() && !menuBar()->actions().isEmpty())
+				menuBar()->setActiveAction(menuBar()->actions().first());
+		}
+	}
+
 	if (event->type() == QEvent::ContextMenu)
 	{
 		// upstream: Scintilla doesn't show its own popup (SC_POPUP_NEVER), WM_CONTEXTMENU reaches the main window

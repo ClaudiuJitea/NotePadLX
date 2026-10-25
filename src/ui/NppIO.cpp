@@ -29,6 +29,7 @@
 
 #include <QDragEnterEvent>
 #include <QDropEvent>
+#include <QDir>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMimeData>
@@ -288,17 +289,44 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 	return buffer;
 }
 
+QString Notepad_plus::fileDialogDir() const
+{
+	// upstream: the dialogs open in NppParameters::getWorkingDir(), which Preferences > Default Directory sets: the
+	// folder of the current file (Notepad_plus::setWorkingDir on activation), the last folder used, or the user's
+	NppParameters& nppParam = NppParameters::getInstance();
+	const NppGUI& nppGUI = nppParam.getNppGUI();
+	switch (nppGUI._openSaveDir)
+	{
+		case dir_userDef:
+			return QString::fromWCharArray(nppGUI._defaultDirExp);
+		case dir_last:
+			return QString::fromWCharArray(nppParam.getWorkingDir());
+		default:
+		{
+			const Buffer* buf = _pEditView->getCurrentBuffer();
+			if (!buf->isUntitled())
+				return QFileInfo(QString::fromWCharArray(buf->getFullPathName())).absolutePath();
+			return QString::fromWCharArray(nppParam.getWorkingDir());
+		}
+	}
+}
+
+void Notepad_plus::rememberFileDialogDir(const QString& filePath)
+{
+	// upstream dir_last: the dialog remembers its folder
+	NppParameters& nppParam = NppParameters::getInstance();
+	if (nppParam.getNppGUI()._openSaveDir == dir_last && !filePath.isEmpty())
+		nppParam.setWorkingDir(QFileInfo(filePath).absolutePath().toStdWString().c_str());
+}
+
 void Notepad_plus::fileOpen()
 {
-	// upstream: CustomFileDialog with the langs.xml filters; the start folder follows the current file
-	Buffer* buf = _pEditView->getCurrentBuffer();
-	QString dir;
-	if (!buf->isUntitled())
-		dir = QFileInfo(QString::fromWCharArray(buf->getFullPathName())).absolutePath();
-
+	// upstream: CustomFileDialog with the langs.xml filters
 	const QString filters = buildFileDialogFilters(L_TEXT, nullptr);
 	const QStringList fileNames = QFileDialog::getOpenFileNames(this,
-		QString::fromStdWString(_nativeLangSpeaker.getNativeLangMenuString(IDM_FILE_OPEN, L"Open", true)), dir, filters);
+		QString::fromStdWString(_nativeLangSpeaker.getNativeLangMenuString(IDM_FILE_OPEN, L"Open", true)), fileDialogDir(), filters);
+	if (!fileNames.isEmpty())
+		rememberFileDialogDir(fileNames.first());
 
 	BufferID lastOpened = BUFFER_INVALID;
 	for (const QString& fn : fileNames)
@@ -641,9 +669,12 @@ bool Notepad_plus::fileSaveAs(BufferID bufferID, bool isSaveCopy)
 	QString initialPath = QString::fromWCharArray(buf->getFileName());
 	if (!wasUntitled)
 		initialPath = QString::fromStdWString(origPathname);
+	if (wasUntitled || nppParam.getNppGUI()._openSaveDir != dir_followCurrent)
+		initialPath = QDir(fileDialogDir()).filePath(QString::fromWCharArray(buf->getFileName()));
 	QString selectedFilter;
 	const QString filters = buildFileDialogFilters(buf->getLangType(), &selectedFilter);
 	const QString chosen = QFileDialog::getSaveFileName(this, QString::fromStdWString(localizedTitle), initialPath, filters, &selectedFilter);
+	rememberFileDialogDir(chosen);
 	wstring fn = chosen.toStdWString();
 
 	// Enable file autodetection again.

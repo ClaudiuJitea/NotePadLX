@@ -765,6 +765,10 @@
 	#define NPPM_INTERNAL_DISABLESELECTEDTEXTDRAGDROP   (NOTEPADPLUS_USER_INTERNAL + 113)
 	#define NPPM_INTERNAL_INCSEARCHBARPOSITION          (NOTEPADPLUS_USER_INTERNAL + 114)
 
+	// NPLX: Preferences > Language shows (lParam TRUE) or hides a language of the Language menu, wParam its command
+	// ID (upstream: DeleteMenu / InsertMenu on the HMENU of NPPM_INTERNAL_GETMENU)
+	#define NPPM_INTERNAL_NPLX_SHOWLANGMENUITEM         (NOTEPADPLUS_USER_INTERNAL + 902) // after the NPLX messages of FindReplaceDlg.h (900, 901)
+
 // See Notepad_plus_msgs.h
 //#define NPPMSG   (WM_USER + 1000)
 
