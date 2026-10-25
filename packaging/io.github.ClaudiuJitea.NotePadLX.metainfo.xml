@@ -36,6 +36,12 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.2" date="2026-10-25">
+      <description>
+        <p>The Shortcut Mapper for menu commands, macros, Run commands and editor keys; the editor keys of
+        shortcuts.xml are applied; function keys can be assigned to editor commands.</p>
+      </description>
+    </release>
     <release version="0.1" date="2026-10-25">
       <description>
         <p>First public version: the main window, files and sessions, search, languages and styling, the docking

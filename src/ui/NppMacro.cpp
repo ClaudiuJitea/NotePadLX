@@ -38,6 +38,7 @@
 #include "RunMacroDlg.h"
 #include "ScintillaEditView.h"
 #include "ShortcutDlg.h"
+#include "ShortcutMapper.h"
 #include "hmac.h"
 #include "menuCmdID.h"
 #include "resource.h"
@@ -169,30 +170,11 @@ void Notepad_plus::updateDynamicMenuShortcuts()
 
 bool Notepad_plus::findKeyConflicts(const KeyCombo& combo) const
 {
-	// NPLX_TODO(Phase 7): upstream ShortcutMapper::findKeyConflicts (NPPM_INTERNAL_FINDKEYCONFLICTS); until the
-	// Shortcut Mapper is ported, the same lookup over the menu commands, macros, Run commands and Scintilla keys
-	if (combo._key == 0)
-		return false;
-
-	auto same = [&combo](const KeyCombo& kc) {
-		return kc._key == combo._key && kc._isCtrl == combo._isCtrl && kc._isAlt == combo._isAlt && kc._isShift == combo._isShift;
-	};
-
-	NppParameters& nppParam = NppParameters::getInstance();
-	for (const CommandShortcut& sc : nppParam.getUserShortcuts())
-		if (sc.isEnabled() && same(sc.getKeyCombo()))
-			return true;
-	for (const MacroShortcut& sc : nppParam.getMacroList())
-		if (sc.isEnabled() && same(sc.getKeyCombo()))
-			return true;
-	for (const UserCommand& sc : nppParam.getUserCommandList())
-		if (sc.isEnabled() && same(sc.getKeyCombo()))
-			return true;
-	for (const ScintillaKeyMap& skm : nppParam.getScintillaKeyList())
-		for (size_t i = 0, n = skm.getSize(); i < n; ++i)
-			if (same(skm.getKeyComboByIndex(i)))
-				return true;
-	return false;
+	// upstream NPPM_INTERNAL_FINDKEYCONFLICTS: a ShortcutMapper session looks the key up in every list
+	if (_pShortcutMapper)
+		return _pShortcutMapper->findKeyConflicts(nullptr, combo, static_cast<size_t>(-1));
+	ShortcutMapper shortcutMapper;
+	return shortcutMapper.findKeyConflicts(nullptr, combo, static_cast<size_t>(-1));
 }
 
 void Notepad_plus::macroPlayback(Macro macro, std::vector<Document>* pDocs4EndUAIn)

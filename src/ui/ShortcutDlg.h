@@ -53,3 +53,34 @@ private:
 	void updateOkState();
 	void updateConflictState();
 };
+
+// NPLX: the dialog part of upstream ScintillaKeyMap (ScintillaKeyMap::doDialog / run_dlgProc, IDD_SHORTCUTSCINT_DLG):
+// the list of key combinations of a Scintilla command
+class ScintillaKeyMapDlg : public RcDialog
+{
+	Q_OBJECT
+
+public:
+	ScintillaKeyMapDlg(ScintillaKeyMap& skm, std::function<bool(const KeyCombo&)> isConflict, QWidget* parent = nullptr);
+
+	// upstream ScintillaKeyMap::doDialog: 0 on OK (the key map is updated), -1 when cancelled
+	int doDialog();
+
+protected:
+	void onCommand(int id, int notification) override;
+	void reject() override { onCommand(IDCANCEL, RcNotifyClicked); }
+
+private:
+	ScintillaKeyMap& _skm;
+	ScintillaKeyMap _edited;  // NPLX: upstream edits the key map in place and the caller keeps a copy
+	KeyCombo _keyCombo;       // upstream uses _keyCombo as a temp. variable for the current settings
+	std::function<bool(const KeyCombo&)> _isConflict;
+	std::vector<UCHAR> _keyIds; // upstream oemVkUsedIDs
+
+	void applyToCurrentIndex();
+	void validateDialog();
+	void showCurrentSettings();
+	void updateListItem(int index);
+	void updateConflictState();
+	bool isComboValid() const;
+};

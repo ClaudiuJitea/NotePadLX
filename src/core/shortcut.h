@@ -67,6 +67,15 @@ static inline size_t keyTranslate(size_t keyIn) {
 		case VK_OEM_4:		return '[';
 		case VK_OEM_5:		return '\\';
 		case VK_OEM_6:		return ']';
+		// NPLX: Scintilla's Qt backend passes the Qt key code (ScintillaEditBase::keyPressEvent): the other
+		// punctuation keys are their character. The function keys stay VK_F1..VK_F24: ScintillaEditView passes
+		// them to Scintilla as such (a Qt::Key_F* code does not fit in the 16 key bits of SCI_ASSIGNCMDKEY)
+		case VK_OEM_1:		return ';';
+		case VK_OEM_PLUS:	return '=';
+		case VK_OEM_COMMA:	return ',';
+		case VK_OEM_MINUS:	return '-';
+		case VK_OEM_PERIOD:	return '.';
+		case VK_OEM_7:		return '\'';
 		default:			return keyIn;
 	}
 }

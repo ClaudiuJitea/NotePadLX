@@ -24,6 +24,7 @@
 
 #include "RunDlg.h"
 #include "RunMacroDlg.h"
+#include "ShortcutMapper.h"
 #include "columnEditor.h"
 #include "md5Dlgs.h"
 #include "VerticalFileSwitcher.h"
@@ -302,6 +303,27 @@ void Notepad_plus::command(int id)
 			}
 			break;
 		}
+
+		case IDM_SETTING_SHORTCUT_MAPPER :
+		case IDM_SETTING_SHORTCUT_MAPPER_MACRO :
+		case IDM_SETTING_SHORTCUT_MAPPER_RUN :
+		{
+			GridState st = id==IDM_SETTING_SHORTCUT_MAPPER_MACRO?STATE_MACRO:id==IDM_SETTING_SHORTCUT_MAPPER_RUN?STATE_USER:STATE_MENU;
+			ShortcutMapper shortcutMapper(this);
+			ShortcutMapperHost host;
+			host._macroMenu = [this]() { return nppMenuOfCommand(IDM_MACRO_STARTRECORDINGMACRO); };
+			host._runMenu = [this]() { return nppMenuOfCommand(IDM_EXECUTE); };
+			host._updateShortcuts = [this]() { updateShortcuts(); };
+			host._updateScintillaKeys = [this]() { updateScintillaKeys(); };
+			host._isRemovedCommand = [](int cmdID) { return isRemovedOnLinux(cmdID); };
+			shortcutMapper.init(std::move(host), st);
+			_pShortcutMapper = &shortcutMapper;
+			shortcutMapper.doDialog();
+			_pShortcutMapper = nullptr;
+			_runMacroDlg->initMacroList(); // NPLX: upstream relies on RunMacroDlg::doDialog reloading the list
+			checkMacroState();
+		}
+		break;
 
 		case IDM_EDIT_COLUMNMODE :
 		{

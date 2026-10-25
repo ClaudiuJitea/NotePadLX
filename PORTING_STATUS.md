@@ -6,17 +6,50 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 |---|---|
 | 0. Bootstrap | ✅ Done (2026‑10‑24) |
 | 1. Portable core | ✅ Done (2026‑10‑24) |
-| 2. Main window | 🚧 Mostly done (menus, toolbar, context menus, 362 commands ported) |
+| 2. Main window | 🚧 Mostly done (menus, toolbar, context menus, 365 commands ported) |
 | 3. Files, sessions, monitoring | 🚧 Mostly done (see session 3) |
 | 4. Find / Replace | 🚧 Mostly done (dialog, Finder, Find in Files, Mark, smart highlight; incremental search open) |
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
-| 7. Dialogs and tools | 🚧 In progress: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes done; Shortcut Mapper and Preferences next |
+| 7. Dialogs and tools | 🚧 In progress: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper done; Preferences next |
 | 8. Polish and platform integration | ⏳ Planned (dark/light themes and the NotePadLX look done early, in sessions 6–7b) |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (version 0.1); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1, 0.2); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.1** (2026‑10‑25), the first public version. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.2** (2026‑10‑25): 0.1 plus the Shortcut Mapper (session 10). Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 10 (2026‑10‑25): Phase 7 — the Shortcut Mapper
+
+- **Settings › Shortcut Mapper…, Macro › Modify Shortcut/Delete Macro…, Run › Modify Shortcut/Delete Command…**:
+  a port of upstream `WinControls/Grid/ShortcutMapper` (`ui/ShortcutMapper.*`, from IDD_SHORTCUTMAPPER_DLG).
+  - Five tabs (Main menu, Macros, Run commands, Plugin commands, Scintilla commands), the word filter, the
+    Category column, and the conflict marking and info box (`findKeyConflicts`).
+  - Modify, Clear and Delete, plus the right-click menu and the Delete key.
+  - Deleting a macro or Run command renumbers the remaining IDs and rebuilds the dynamic menu; the last one
+    removes the separators and the "Modify Shortcut/Delete…" item.
+  - The window is resizable, with a saved and restored view per tab.
+- **BabyGrid:** `ui/BabyGridWrapper.*` keeps upstream's API (row 0 = titles, column 0 = row numbers) on a
+  `QTableWidget`; the BGN_* notifications are callbacks.
+- **The Scintilla key dialog:** `ScintillaKeyMapDlg` (IDD_SHORTCUTSCINT_DLG) edits a command's list of keys (Add,
+  Remove, Apply).
+- **Accelerators** (`ui/NppShortcuts.cpp`):
+  - `updateShortcuts()` ports `Accelerator::updateShortcuts` and `updateFullMenu` (menu QAction shortcuts,
+    hidden QActions for commands without a menu item, the macro and Run command keys and names).
+  - `updateScintillaKeys()` ports `ScintillaAccelerator::updateKeys`. It runs at startup, so the ScintillaKeys
+    of `shortcuts.xml` now apply (they were ignored before). The menu items of Scintilla commands show their
+    key (e.g. "Select All  Ctrl+A") without becoming menu shortcuts, so the key still reaches the focused
+    edit box.
+  - `updateCommandShortcuts()` ports the command names (from the menu) and `setCategoryFromMenu`; they were
+    empty before.
+  - `NPPM_INTERNAL_FINDKEYCONFLICTS` now goes through `ShortcutMapper::findKeyConflicts`, as upstream; the
+    earlier NotePadLX stand-in is removed.
+- **Keys:**
+  - `keyTranslate` maps the remaining punctuation keys (`;` `=` `,` `-` `.` `'`) to Scintilla-Qt's codes.
+  - `ScintillaEditView` passes F1–F24 to Scintilla as `VK_F*`: a `Qt::Key_F*` code does not fit in
+    SCI_ASSIGNCMDKEY's 16 key bits, so Scintilla commands could not have function keys.
+- The Windows-only commands removed from the menus are not listed in the mapper. `winKeyDefs` names say File
+  Manager / Terminal.
+- **Tests:** `tests/tst_shortcuts.cpp` (11 cases); 15/15 suites pass.
 
 ## Session 9 (2026‑10‑25): version 0.1, packages, README
 
@@ -80,7 +113,7 @@ one is planned:
 | Phase | Menu items |
 |---|---|
 | 3/4 leftovers | File › Load Session…, Save Session…; Search › Incremental Search; View › Tab › Apply Color 1–5, Remove Color |
-| 7 | Settings › Preferences…, Shortcut Mapper… (also Macro/Run › Modify Shortcut/Delete…), Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range…; Edit › Paste Special › Paste HTML/RTF Content, Copy/Cut/Paste Binary Content; Edit › On Selection › Open File, Open Containing Folder in File Manager, Redact Selection, Change Search Engine… |
+| 7 | Settings › Preferences…, Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range…; Edit › Paste Special › Paste HTML/RTF Content, Copy/Cut/Paste Binary Content; Edit › On Selection › Open File, Open Containing Folder in File Manager, Redact Selection, Change Search Engine… |
 | 8 | File › Print…, Print Now; View › Toggle Full Screen Mode, Post‑It, Distraction Free Mode; View › Move/Clone › Move to / Open in New Instance; ? › Command Line Arguments…, Debug Info…; the About dialog (port of AboutDlg); localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |

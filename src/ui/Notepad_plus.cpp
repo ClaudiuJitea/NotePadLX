@@ -81,7 +81,7 @@ namespace
 
 	// NPLX: the Windows-only commands that NotePadLX removes from the menu (no Linux equivalent, see PORTING_STATUS.md
 	// "Not ported"). Upstream also deletes the updater items at init when there is no updater.
-	bool isRemovedOnLinux(int id)
+	bool isRemovedOnLinuxImpl(int id)
 	{
 		switch (id)
 		{
@@ -440,6 +440,11 @@ void Notepad_plus::init()
 		drawAutocompleteColoursFromTheme(pStyle->_fgColor, pStyle->_bgColor);
 	}
 
+	// upstream Notepad_plus::init: the categories of the Shortcut Mapper, then the Scintilla keys
+	// (Notepad_plus_Window::init: _scintaccelerator.updateKeys())
+	updateCommandShortcuts();
+	updateScintillaKeys();
+
 	// Macro Menu, Run Menu
 	initDynamicMenus();
 	checkMacroState();
@@ -588,6 +593,11 @@ bool Notepad_plus::isMenuItemChecked(int itemID) const
 	return action && action->isChecked();
 }
 
+bool Notepad_plus::isRemovedOnLinux(int id)
+{
+	return isRemovedOnLinuxImpl(id);
+}
+
 QAction* Notepad_plus::actionFor(int id) const
 {
 	auto it = _actions.find(id);
@@ -681,7 +691,7 @@ void Notepad_plus::buildMainMenu()
 			{
 				if (topLevel) // right-aligned tab-bar shortcuts, see above
 					break;
-				if (isRemovedOnLinux(def._id))
+				if (isRemovedOnLinuxImpl(def._id))
 					break;
 
 				// Localised label (nativeLang.xml), falling back to the .rc text
@@ -727,24 +737,8 @@ void Notepad_plus::buildMainMenu()
 		menu->setToolTipsVisible(true);
 
 	// NPLX: the commands without a menu item still have their shortcuts (upstream: the accelerator table built from
-	// all the shortcuts, e.g. Ctrl+Tab = IDC_NEXT_DOC)
-	std::set<int> doneIds;
-	for (const auto& [id, key] : shortcuts)
-	{
-		if (doneIds.count(id) || actionFor(id) || !isCommandPorted(id))
-			continue;
-		doneIds.insert(id);
-		QList<QKeySequence> keys;
-		for (auto [it, end] = shortcuts.equal_range(id); it != end; ++it)
-			keys.push_back(it->second);
-		auto* hidden = new QAction(this);
-		hidden->setData(id);
-		hidden->setShortcuts(keys);
-		hidden->setShortcutContext(Qt::WindowShortcut);
-		addAction(hidden);
-		const int cmdID = id;
-		connect(hidden, &QAction::triggered, this, [this, cmdID]() { command(cmdID); });
-	}
+	// all the shortcuts, e.g. Ctrl+Tab = IDC_NEXT_DOC); see updateShortcuts
+	updateShortcuts();
 
 	// upstream WM_INITMENUPOPUP -> WindowsMenu::initPopupMenu: the document list of the Window menu
 	if (const QAction* windowsAction = actionFor(IDM_WINDOW_WINDOWS))

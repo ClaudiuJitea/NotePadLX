@@ -117,3 +117,11 @@ target_compile_definitions(tst_screenshots PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${
 target_link_libraries(tst_screenshots PRIVATE nplx_ui Qt6::Test)
 add_test(NAME screenshots COMMAND tst_screenshots)
 set_tests_properties(screenshots PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Phase 7: Shortcut Mapper
+add_executable(tst_shortcuts tst_shortcuts.cpp)
+set_target_properties(tst_shortcuts PROPERTIES AUTOMOC ON)
+target_compile_definitions(tst_shortcuts PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT_SOURCE_DIR}/data")
+target_link_libraries(tst_shortcuts PRIVATE nplx_ui Qt6::Test)
+add_test(NAME shortcuts COMMAND tst_shortcuts)
+set_tests_properties(shortcuts PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

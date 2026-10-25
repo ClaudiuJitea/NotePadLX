@@ -17,18 +17,23 @@
 
 #include "ShortcutDlg.h"
 
+#include <algorithm>
+
 #include <QComboBox>
 #include <QLineEdit>
+#include <QListWidget>
 
 #include "Common.h"
 #include "RunDlg_rc.h"
 #include "RunMacroDlg_rc.h"
+#include "ShortcutMapper_rc.h"
 #include "resource.h"
 #include "shortcutRc.h"
 
 namespace
 {
 #include "RcShortcutRunDialogs.inc"
+#include "RcShortcutMapper.inc"
 }
 
 ShortcutDlg::ShortcutDlg(Shortcut& shortcut, std::function<bool(const KeyCombo&)> isConflict, QWidget* parent)
@@ -168,6 +173,231 @@ void ShortcutDlg::onCommand(int id, int notification)
 		case IDCANCEL :
 			QDialog::reject();
 			return;
+
+		default:
+			return;
+	}
+}
+
+// ---- ScintillaKeyMapDlg: upstream ScintillaKeyMap::run_dlgProc (shortcut.cpp)
+
+ScintillaKeyMapDlg::ScintillaKeyMapDlg(ScintillaKeyMap& skm, std::function<bool(const KeyCombo&)> isConflict, QWidget* parent)
+	: RcDialog(parent), _skm(skm), _edited(skm), _isConflict(std::move(isConflict))
+{
+	buildFrom(IDD_SHORTCUTSCINT_DLG_def);
+	setModal(true);
+}
+
+bool ScintillaKeyMapDlg::isComboValid() const
+{
+	// upstream isValid() on the temp. _keyCombo
+	Shortcut probe(_edited.getName(), _keyCombo._isCtrl, _keyCombo._isAlt, _keyCombo._isShift, _keyCombo._key);
+	return probe.isValid();
+}
+
+//This procedure uses _keyCombo as a temp. variable to store current settings which can then later be applied (by pressing OK)
+void ScintillaKeyMapDlg::applyToCurrentIndex()
+{
+	const int index = listBox(IDC_LIST_KEYS)->currentRow();
+	if (index < 0)
+		return;
+	_edited.setKeyComboByIndex(index, _keyCombo);
+	updateListItem(index);
+	listBox(IDC_LIST_KEYS)->setCurrentRow(index);
+}
+
+void ScintillaKeyMapDlg::validateDialog()
+{
+	bool valid = isComboValid();	//current combo valid?
+	bool isDisabling = _keyCombo._key == 0;	//true if this keycombo were to disable the shortcut
+	bool isDisabled = !_edited.isEnabled();	//true if this shortcut already is
+	bool isDuplicate = false; //true if already in the list
+	const size_t size = _edited.getSize();
+
+	for (size_t i = 0; i < size; ++i)
+	{
+		const KeyCombo kc = _edited.getKeyComboByIndex(i);
+		if (_keyCombo._key   == kc._key   && _keyCombo._isCtrl  == kc._isCtrl &&
+			_keyCombo._isAlt == kc._isAlt && _keyCombo._isShift == kc._isShift)
+		{
+			isDuplicate = true;
+			break;
+		}
+	}
+
+	enableItem(IDC_BUTTON_ADD, valid && !isDisabling && !isDuplicate);
+	enableItem(IDC_BUTTON_APPLY, valid && (!isDisabling || size == 1) && !isDuplicate);
+	enableItem(IDC_BUTTON_RMVE, size > 1);
+	showItem(IDC_WARNING_STATIC, isDisabled);
+	updateConflictState();
+}
+
+void ScintillaKeyMapDlg::updateConflictState()
+{
+	// upstream Shortcut::updateConflictState: NPPM_INTERNAL_FINDKEYCONFLICTS
+	const bool isConflict = _isConflict && _keyCombo._key != 0 && _isConflict(_keyCombo);
+	showItem(IDC_CONFLICT_STATIC, isConflict);
+}
+
+void ScintillaKeyMapDlg::showCurrentSettings()
+{
+	const int keyIndex = std::max(0, listBox(IDC_LIST_KEYS)->currentRow());
+	_keyCombo = _edited.getKeyComboByIndex(keyIndex);
+	setChecked(IDC_CTRL_CHECK, _keyCombo._isCtrl);
+	setChecked(IDC_ALT_CHECK, _keyCombo._isAlt);
+	setChecked(IDC_SHIFT_CHECK, _keyCombo._isShift);
+	const bool wasUpdating = _isUpdatingControls;
+	_isUpdatingControls = true;
+	for (size_t i = 0 ; i < _keyIds.size() ; ++i)
+	{
+		if (_keyCombo._key == _keyIds[i])
+		{
+			comboBox(IDC_KEY_COMBO)->setCurrentIndex(static_cast<int>(i));
+			break;
+		}
+	}
+	_isUpdatingControls = wasUpdating;
+}
+
+void ScintillaKeyMapDlg::updateListItem(int index)
+{
+	if (QListWidgetItem* item = listBox(IDC_LIST_KEYS)->item(index))
+		item->setText(QString::fromStdWString(string2wstring(_edited.toString(index), CP_UTF8)));
+}
+
+int ScintillaKeyMapDlg::doDialog()
+{
+	// upstream WM_INITDIALOG
+	setItemText(IDC_NAME_EDIT, string2wstring(_edited.getName(), CP_UTF8));
+	_keyCombo = _edited.getKeyComboByIndex(0);
+
+	_keyIds.clear();	// the logic below (always pushing onto the vector) requires that it starts fresh every time
+	const bool wasUpdating = _isUpdatingControls;
+	_isUpdatingControls = true;
+	for (size_t i = 0, nbKeys = namedKeyCount(); i < nbKeys; ++i)
+	{
+		const char* nameStr = namedKeyName(i);
+		// NPLX: upstream renames the VK_OEM_* keys after the keyboard layout (mapOemVirtualKeys); the US names here
+		// only add a key to the IDC_KEY_COMBO list if the string is not empty
+		if (nameStr[0])
+		{
+			comboBox(IDC_KEY_COMBO)->addItem(QString::fromStdWString(string2wstring(nameStr, CP_UTF8)));
+			_keyIds.push_back(namedKeyId(i));
+		}
+	}
+
+	for (size_t i = 0; i < _edited.getSize(); ++i)
+		listBox(IDC_LIST_KEYS)->addItem(QString::fromStdWString(string2wstring(_edited.toString(i), CP_UTF8)));
+	listBox(IDC_LIST_KEYS)->setCurrentRow(0);
+	_isUpdatingControls = wasUpdating;
+
+	showCurrentSettings();
+	validateDialog();
+	// Hide this warning on startup
+	showItem(IDC_WARNING_STATIC, false);
+	// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "ShortcutMapperSubDialg")
+
+	return exec() == QDialog::Accepted ? 0 : -1;
+}
+
+void ScintillaKeyMapDlg::onCommand(int id, int notification)
+{
+	if (notification == RcNotifySelChange)
+	{
+		switch (id)
+		{
+			case IDC_KEY_COMBO:
+			{
+				const int iSel = comboBox(IDC_KEY_COMBO)->currentIndex();
+				if (iSel >= 0 && static_cast<size_t>(iSel) < _keyIds.size())
+					_keyCombo._key = _keyIds[iSel];
+				showItem(IDC_WARNING_STATIC, !_edited.isEnabled());
+				validateDialog();
+				return;
+			}
+			case IDC_LIST_KEYS:
+			{
+				showCurrentSettings();
+				validateDialog();
+				return;
+			}
+			default:
+				return;
+		}
+	}
+	if (notification != RcNotifyClicked)
+		return;
+
+	switch (id)
+	{
+		case IDC_CTRL_CHECK :
+			_keyCombo._isCtrl = isCheckedOrNot(IDC_CTRL_CHECK);
+			validateDialog();
+			return;
+
+		case IDC_ALT_CHECK :
+			_keyCombo._isAlt = isCheckedOrNot(IDC_ALT_CHECK);
+			validateDialog();
+			return;
+
+		case IDC_SHIFT_CHECK :
+			_keyCombo._isShift = isCheckedOrNot(IDC_SHIFT_CHECK);
+			validateDialog();
+			return;
+
+		case IDOK :
+			_skm = _edited;
+			accept();
+			return;
+
+		case IDCANCEL :
+			QDialog::reject();
+			return;
+
+		case IDC_BUTTON_ADD:
+		{
+			const size_t oldsize = _edited.getSize();
+			int res = _edited.addKeyCombo(_keyCombo);
+			if (res > -1)
+			{
+				if (res == static_cast<int32_t>(oldsize))
+				{
+					listBox(IDC_LIST_KEYS)->addItem(QString::fromStdWString(string2wstring(_edited.toString(res), CP_UTF8)));
+				}
+				else
+				{	//update current string, can happen if it was disabled
+					updateListItem(res);
+				}
+				listBox(IDC_LIST_KEYS)->setCurrentRow(res);
+			}
+			showCurrentSettings();
+			validateDialog();
+			return;
+		}
+
+		case IDC_BUTTON_RMVE:
+		{
+			if (_edited.getSize() == 1)	//cannot delete last shortcut
+				return;
+			int i = listBox(IDC_LIST_KEYS)->currentRow();
+			if (i < 0)
+				return;
+			_edited.removeKeyComboByIndex(i);
+			delete listBox(IDC_LIST_KEYS)->takeItem(i);
+			if (static_cast<size_t>(i) == _edited.getSize())
+				i = static_cast<int>(_edited.getSize()) - 1;
+			listBox(IDC_LIST_KEYS)->setCurrentRow(i);
+			showCurrentSettings();
+			validateDialog();
+			return;
+		}
+
+		case IDC_BUTTON_APPLY:
+		{
+			applyToCurrentIndex();
+			validateDialog();
+			return;
+		}
 
 		default:
 			return;

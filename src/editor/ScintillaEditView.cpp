@@ -566,6 +566,17 @@ void ScintillaEditView::keyPressEvent(QKeyEvent* event)
 		}
 	}
 
+	// NPLX: the function keys reach Scintilla as VK_F1..VK_F24, the codes of the Scintilla key definitions
+	// (shortcuts.xml ScintillaKeys); a Qt::Key_F* code does not fit in the 16 key bits of SCI_ASSIGNCMDKEY
+	if (event->key() >= Qt::Key_F1 && event->key() <= Qt::Key_F24)
+	{
+		QKeyEvent vkEvent(event->type(), VK_F1 + (event->key() - Qt::Key_F1), event->modifiers(), event->text(),
+			event->isAutoRepeat(), static_cast<ushort>(event->count()));
+		ScintillaEditBase::keyPressEvent(&vkEvent);
+		event->setAccepted(vkEvent.isAccepted());
+		return;
+	}
+
 	ScintillaEditBase::keyPressEvent(event);
 }
 

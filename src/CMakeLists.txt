@@ -137,6 +137,13 @@ add_library(nplx_ui STATIC
     ui/RunMacroDlg_rc.h
     ui/ShortcutDlg.cpp
     ui/md5Dlgs.cpp
+    ui/BabyGridWrapper.cpp
+    ui/BabyGridWrapper.h
+    ui/NppShortcuts.cpp
+    ui/ShortcutMapper.cpp
+    ui/ShortcutMapper.h
+    ui/ShortcutMapper_rc.h
+    ui/RcShortcutMapper.inc
     ui/columnEditor.cpp
     ui/columnEditor.h
     ui/columnEditor_rc.h

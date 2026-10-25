@@ -9,7 +9,7 @@
 A native Qt 6 source code editor built from the Notepad++ sources, with the same Scintilla editing engine, the
 same languages and themes, and Notepad++-compatible configuration files.
 
-[![Version](https://img.shields.io/badge/version-0.1-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
+[![Version](https://img.shields.io/badge/version-0.2-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 [![Qt 6](https://img.shields.io/badge/Qt-6-41cd52?logo=qt&logoColor=white)](https://www.qt.io/)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-fcc624?logo=linux&logoColor=black)](#install)
@@ -34,7 +34,7 @@ and Qt 6, keeping its algorithms, its command IDs, and its `config.xml`, `styler
 | **Themes** | All the Notepad++ themes and the Style Configurator. Default: dark interface with **Solarized** |
 | **Search** | Find, Replace, Mark, **Find in Files**, Find in Projects, the Finder results panel, Boost regular expressions |
 | **Panels** | Function List, Document Map, Document List, Folder as Workspace, Project Panels, Character Panel, Clipboard History |
-| **Automation** | **Macro** recording, playback, saving and multiple runs. The **Run** menu with Notepad++ variables like `$(FULL_CURRENT_PATH)` |
+| **Automation** | **Macro** recording, playback, saving and multiple runs. The **Run** menu with Notepad++ variables like `$(FULL_CURRENT_PATH)`. The **Shortcut Mapper** for every command, macro and editor key |
 | **Tools** | **Column Editor** (text or numbers, dec/hex/oct/bin), **MD5 / SHA-1 / SHA-256 / SHA-512** from text, files or the selection |
 | **Files** | Sessions and session snapshots, file monitoring (tail -f), encodings and EOL conversion, recent files, move to trash |
 | **Desktop** | Single instance, `.desktop` integration, Wayland and X11, the desktop's file manager and terminal |
@@ -74,21 +74,21 @@ Download from the [Releases](https://github.com/ClaudiuJitea/NotePadLX/releases)
 ### AppImage (any distribution)
 
 ```sh
-chmod +x NotePadLX-0.1-x86_64.AppImage
-./NotePadLX-0.1-x86_64.AppImage
+chmod +x NotePadLX-0.2-x86_64.AppImage
+./NotePadLX-0.2-x86_64.AppImage
 ```
 
-The AppImage bundles Qt and the other libraries. It needs an x86_64 system with glibc 2.43 or newer (the 0.1
+The AppImage bundles Qt and the other libraries. It needs an x86_64 system with glibc 2.43 or newer (the
 packages are built on Ubuntu 26.04). On an older distribution, [build from source](#build-from-source).
 
 ### Debian / Ubuntu (.deb)
 
 ```sh
-sudo apt install ./notepadlx_0.1_amd64.deb
+sudo apt install ./notepadlx_0.2_amd64.deb
 ```
 
 This installs `notepadlx` in `/usr/bin`, the menu entry, the icons, the man page, and the default settings in
-`/usr/share/notepadlx`. It uses the system's Qt 6. The 0.1 package is built for Ubuntu 26.04 (Qt 6.10). On other
+`/usr/share/notepadlx`. It uses the system's Qt 6. The package is built for Ubuntu 26.04 (Qt 6.10). On other
 releases, [build from source](#build-from-source): it builds with Qt 6.5 or newer.
 
 Your settings live in `~/.config/notepadlx/`, in the Notepad++ formats. To bring over your Notepad++ themes,
@@ -105,7 +105,7 @@ sudo dnf install gcc-c++ cmake ninja-build qt6-qtbase-devel qt6-qt5compat-devel 
 cmake -S . -B build -G Ninja
 cmake --build build
 build/src/notepadlx            # runs from the build tree, no installation needed
-cd build && ctest              # 14 test suites
+cd build && ctest              # 15 test suites
 ```
 
 Packages: `packaging/build-packages.sh` builds `dist/notepadlx_<version>_amd64.deb` and
@@ -116,19 +116,19 @@ dependencies.
 
 ## Project status
 
-NotePadLX 0.1 is the first public version. The port follows a [10-phase plan](PROMPT.md); detailed progress is
+NotePadLX 0.2 adds the Shortcut Mapper to the first public version (0.1). The port follows a [10-phase plan](PROMPT.md); detailed progress is
 in [PORTING_STATUS.md](PORTING_STATUS.md).
 
 | Phase | | Status |
 |---|---|---|
 | 0 | Bootstrap: CMake, vendored Scintilla / Lexilla / Boost.Regex | ✅ Done |
 | 1 | Portable core: parameters, encodings, file I/O, sessions | ✅ Done |
-| 2 | Main window: menus, toolbar, tabs, split views, context menus | ✅ Mostly done (362 commands ported) |
+| 2 | Main window: menus, toolbar, tabs, split views, context menus | ✅ Mostly done (365 commands ported) |
 | 3 | Files, sessions, monitoring | ✅ Mostly done (Load/Save Session dialogs pending) |
 | 4 | Find / Replace, Find in Files, Mark, the Finder | ✅ Mostly done (incremental search pending) |
 | 5 | Languages, themes, Style Configurator, User Defined Languages | ✅ Done |
 | 6 | Docking panels | ✅ Done |
-| 7 | Dialogs and tools: macros, Run, Column Editor, hashes ✅; Shortcut Mapper, Preferences next | 🚧 In progress |
+| 7 | Dialogs and tools: macros, Run, Column Editor, hashes, Shortcut Mapper ✅; Preferences next | 🚧 In progress |
 | 8 | Printing, full screen and distraction free, localization, About / Debug Info | ⏳ Planned |
 | 9 | Plugin API for Linux (`.so` plugins with the Notepad++ messages) | ⏳ Planned |
 | 10 | Packaging: `.deb` and AppImage ✅; Flatpak, `.rpm`, CI next | 🚧 In progress |

@@ -265,6 +265,14 @@ public:
 	void saveShortcuts();
 	void initDynamicMenus(); // upstream Notepad_plus::init: the Macro and Run menus
 	void updateDynamicMenuShortcuts(); // upstream _accelerator.updateShortcuts() for the macros and Run commands
+
+	// --- shortcuts (NppShortcuts.cpp; upstream Accelerator / ScintillaAccelerator in shortcut.cpp)
+	void updateShortcuts();     // upstream Accelerator::updateShortcuts + updateFullMenu
+	void updateScintillaKeys(); // upstream ScintillaAccelerator::updateKeys
+	void updateCommandShortcuts(); // upstream: the names (from the menu) and the categories of the menu commands
+	void setShortcutCategories(); // upstream CommandShortcut::setCategoryFromMenu for each menu command
+	static bool isRemovedOnLinux(int id); // NPLX: a Windows-only command, not in the menus nor the Shortcut Mapper
+	class ShortcutMapper* activeShortcutMapper() const { return _pShortcutMapper; } // NPLX: tests
 	const Macro& currentMacro() const { return _macro; } // NPLX: tests
 	bool isRecordingMacro() const { return _recordingMacro; } // NPLX: tests
 	RunDlg* getRunDlg() const { return _runDlg; } // NPLX: tests
@@ -405,6 +413,7 @@ private:
 	FindReplaceDlg* _findReplaceDlg = nullptr;
 	RunDlg* _runDlg = nullptr;
 	RunMacroDlg* _runMacroDlg = nullptr;
+	class ShortcutMapper* _pShortcutMapper = nullptr; // upstream: the open Shortcut Mapper (NPPM_INTERNAL_FINDKEYCONFLICTS)
 	// upstream _md5FromFilesDlg, _md5FromTextDlg, _sha1From..., _sha2From..., _sha512From... (created on first use)
 	ColumnEditorDlg* _colEditorDlg = nullptr; // upstream _colEditorDlg (created on first use)
 	HashFromFilesDlg* _md5FromFilesDlg = nullptr;
@@ -463,5 +472,6 @@ private:
 
 	LastRecentFileList _lastRecentFileList;
 	std::multimap<int, QAction*> _actions; // IDM_* -> menu actions (an id can appear in several menus)
+	std::map<int, QAction*> _hiddenShortcutActions; // NPLX: the shortcuts of the commands without a menu item
 	std::map<int, QAction*> _langActions;
 };
