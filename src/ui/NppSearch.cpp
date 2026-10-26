@@ -266,7 +266,7 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 
 		case WM_UPDATEMAINMENUBITMAPS:
 		{
-			// NPLX_TODO(Phase 8): coloured bitmaps of the Mark Style menu items
+			setupColorSampleBitmapsOnMainMenuItems();
 			return TRUE;
 		}
 

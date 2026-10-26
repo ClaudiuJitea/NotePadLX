@@ -350,7 +350,7 @@ void Notepad_plus::getCurrentOpenedFiles(Session & session, bool includeUntitled
 			sessionFileInfo sfi(buf->getFullPathName(), langName, buf->getEncoding(), buf->getUserReadOnly(), buf->isPinned(), buf->isUntitledTabRenamed(), buf->getPosition(editView), buf->getBackupFileName().c_str(), buf->getLastModifiedFileTimestamp(), buf->getMapPosition());
 
 			sfi._isMonitoring = buf->isMonitoringOn();
-			sfi._individualTabColour = -1; // NPLX_TODO(Phase 3): individual tab colours
+			sfi._individualTabColour = buf->getDocColorId();
 			sfi._isRTL = buf->isRTL();
 
 			_invisibleEditView->execute(SCI_SETDOCPOINTER, 0, buf->getDocument());
@@ -490,7 +490,7 @@ bool Notepad_plus::loadSession(Session & session, bool isSnapshotMode, const wch
 			if (i == 0 && session._activeMainIndex == 0)
 				_mainEditView->changeTextDirection(buf->isRTL());
 
-			// NPLX_TODO(Phase 3): individual tab colours (_mainDocTab->setIndividualTabColour)
+			_mainDocTab->setIndividualTabColour(lastOpened, session._mainViewFiles[i]._individualTabColour);
 
 			//Force in the document so we can add the markers
 			//Don't use default methods because of performance
@@ -615,7 +615,7 @@ bool Notepad_plus::loadSession(Session & session, bool isSnapshotMode, const wch
 
 			buf->setRTL(session._subViewFiles[k]._isRTL);
 
-			// NPLX_TODO(Phase 3): individual tab colours (_subDocTab->setIndividualTabColour)
+			_subDocTab->setIndividualTabColour(lastOpened, session._subViewFiles[k]._individualTabColour);
 
 			//Force in the document so we can add the markers
 			//Don't use default methods because of performance

@@ -511,6 +511,24 @@ void Notepad_plus::command(int id)
 			break;
 		}
 
+		case IDM_VIEW_TAB_COLOUR_NONE:
+		case IDM_VIEW_TAB_COLOUR_1:
+		case IDM_VIEW_TAB_COLOUR_2:
+		case IDM_VIEW_TAB_COLOUR_3:
+		case IDM_VIEW_TAB_COLOUR_4:
+		case IDM_VIEW_TAB_COLOUR_5:
+		{
+			const int color_id = (id - IDM_VIEW_TAB_COLOUR_NONE) - 1;
+			const auto current_index = _pDocTab->getCurrentTabIndex();
+			BufferID buffer_id = _pDocTab->getBufferByIndex(current_index);
+			_pDocTab->setIndividualTabColour(buffer_id, color_id);
+			_pDocTab->update(); // upstream redraw
+
+			if (_pDocumentListPanel != nullptr)
+				_pDocumentListPanel->setItemColor(buffer_id);
+			break;
+		}
+
 		case IDM_SETTING_PREFERENCE:
 		{
 			// upstream: _preference.doDialog(isRTL); NPLX: created on first use, with the messages to this window

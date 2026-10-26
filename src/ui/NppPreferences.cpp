@@ -25,6 +25,8 @@
 #include <QApplication>
 #include <QMenu>
 #include <QMenuBar>
+#include <QPainter>
+#include <QPixmap>
 #include <QStatusBar>
 #include <QToolBar>
 
@@ -89,6 +91,70 @@ void Notepad_plus::applyToolbarIconSet()
 	_toolBar->update();
 	for (QAction* action : _toolBar->actions())
 		action->setIcon(action->icon()); // the icons are drawn again with the new style
+}
+
+void Notepad_plus::setupColorSampleBitmapsOnMainMenuItems()
+{
+	// set up bitmaps on menu items
+	// style-related bitmaps of color samples
+	struct
+	{
+		int firstOfThisColorMenuId;
+		int styleIndic;
+		std::vector<int> sameColorMenuIds;
+	}
+	bitmapOnStyleMenuItemsInfo[] =
+	{
+		{ IDM_SEARCH_GONEXTMARKER5, SCE_UNIVERSAL_FOUND_STYLE_EXT5, { IDM_SEARCH_MARKALLEXT5, IDM_SEARCH_MARKONEEXT5, IDM_SEARCH_UNMARKALLEXT5, IDM_SEARCH_GOPREVMARKER5, IDM_SEARCH_STYLE5TOCLIP } },
+		{ IDM_SEARCH_GONEXTMARKER4, SCE_UNIVERSAL_FOUND_STYLE_EXT4, { IDM_SEARCH_MARKALLEXT4, IDM_SEARCH_MARKONEEXT4, IDM_SEARCH_UNMARKALLEXT4, IDM_SEARCH_GOPREVMARKER4, IDM_SEARCH_STYLE4TOCLIP } },
+		{ IDM_SEARCH_GONEXTMARKER3, SCE_UNIVERSAL_FOUND_STYLE_EXT3, { IDM_SEARCH_MARKALLEXT3, IDM_SEARCH_MARKONEEXT3, IDM_SEARCH_UNMARKALLEXT3, IDM_SEARCH_GOPREVMARKER3, IDM_SEARCH_STYLE3TOCLIP } },
+		{ IDM_SEARCH_GONEXTMARKER2, SCE_UNIVERSAL_FOUND_STYLE_EXT2, { IDM_SEARCH_MARKALLEXT2, IDM_SEARCH_MARKONEEXT2, IDM_SEARCH_UNMARKALLEXT2, IDM_SEARCH_GOPREVMARKER2, IDM_SEARCH_STYLE2TOCLIP } },
+		{ IDM_SEARCH_GONEXTMARKER1, SCE_UNIVERSAL_FOUND_STYLE_EXT1, { IDM_SEARCH_MARKALLEXT1, IDM_SEARCH_MARKONEEXT1, IDM_SEARCH_UNMARKALLEXT1, IDM_SEARCH_GOPREVMARKER1, IDM_SEARCH_STYLE1TOCLIP } },
+		{ IDM_SEARCH_GONEXTMARKER_DEF, SCE_UNIVERSAL_FOUND_STYLE, { IDM_SEARCH_GOPREVMARKER_DEF, IDM_SEARCH_MARKEDTOCLIP } }
+	};
+
+	// upstream generateSolidColourMenuItemIcon: a square of the colour with a frame
+	auto colorIcon = [](COLORREF color) {
+		QPixmap pm(16, 16);
+		pm.fill(Qt::transparent);
+		QPainter p(&pm);
+		p.setRenderHint(QPainter::Antialiasing);
+		p.setPen(QColor(0x80, 0x80, 0x80));
+		p.setBrush(QColor(GetRValue(color), GetGValue(color), GetBValue(color)));
+		p.drawRoundedRect(QRectF(1.5, 1.5, 13, 13), 3, 3);
+		return QIcon(pm);
+	};
+	auto setIcon = [this](int cmdID, const QIcon& icon) {
+		for (auto [it, end] = _actions.equal_range(cmdID); it != end; ++it)
+		{
+			it->second->setIcon(icon);
+			it->second->setIconVisibleInMenu(true);
+		}
+		if (QAction* tabAction = _tabPopupMenu.action(cmdID))
+		{
+			tabAction->setIcon(icon);
+			tabAction->setIconVisibleInMenu(true);
+		}
+	};
+
+	NppParameters& nppParam = NppParameters::getInstance();
+	StyleArray& styleArray = nppParam.getMiscStylerArray();
+
+	for (const auto& info : bitmapOnStyleMenuItemsInfo)
+	{
+		const Style* pStyle = styleArray.findByID(info.styleIndic);
+		if (pStyle == nullptr)
+			continue;
+
+		const QIcon icon = colorIcon(pStyle->_bgColor);
+		setIcon(info.firstOfThisColorMenuId, icon);
+		for (int relatedMenuId : info.sameColorMenuIds)
+			setIcon(relatedMenuId, icon);
+	}
+
+	// Adds tab color icons
+	for (int i = 0; i < TAB_COLORS_COUNT; ++i)
+		setIcon(IDM_VIEW_TAB_COLOUR_1 + i, colorIcon(nppParam.getIndividualTabColor(i, NppDarkMode::isEnabled(), true)));
 }
 
 void Notepad_plus::removeAllHotSpot()
@@ -212,6 +278,7 @@ void Notepad_plus::refreshDarkMode(bool resetStyle)
 
 	// the panels and the views follow the new colours
 	nppMessage(WM_UPDATESCINTILLAS, TRUE, 0);
+	setupColorSampleBitmapsOnMainMenuItems(); // the tab colours of the mode
 	for (DocTabView* tab : { _mainDocTab, _subDocTab })
 		tab->applyTabStatus();
 }

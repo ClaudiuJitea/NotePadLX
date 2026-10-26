@@ -468,6 +468,7 @@ void Notepad_plus::init()
 	buildMainMenu();
 	buildToolBar();
 	hideExcludedLanguages();
+	setupColorSampleBitmapsOnMainMenuItems();
 
 	// upstream getNameStrFromCmd reads the label of a command from the menu (GetMenuString)
 	g_menuCommandNameResolver = [this](unsigned long id) {
@@ -2468,7 +2469,7 @@ void Notepad_plus::showTabContextMenu(int whichOne, const QPoint& globalPos)
 		// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeLangTabContextMenu
 	}
 
-	// NPLX_TODO(Phase 3): tab colour icons (IDM_VIEW_TAB_COLOUR_*), with individual tab colours
+	setupColorSampleBitmapsOnMainMenuItems(); // the tab colour samples of this menu too
 
 	// NPLX: commands not ported yet stay disabled, like in the main menu
 	auto enableItem = [this](int cmdID, bool isEnable) {

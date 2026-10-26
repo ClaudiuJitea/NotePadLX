@@ -440,6 +440,7 @@ private:
 	void refreshDarkMode(bool resetStyle);
 	void removeAllHotSpot();
 	void hideExcludedLanguages(); // NPLX: upstream removes the excluded languages from the menu at init
+	void setupColorSampleBitmapsOnMainMenuItems(); // the Mark style and tab colour samples of the menu items
 	void showLanguageMenuItem(int cmdID, bool show);
 	void buildLanguageMenu(QMenu* langMenu);
 	void setupEditView(ScintillaEditView* view);

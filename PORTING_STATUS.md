@@ -18,6 +18,17 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 
 **Current version: 0.6** (2026‑10‑25): sessions 10–14 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
 
+## Session 16 (2026‑10‑26): tab colours
+
+- **View › Tab › Apply Color 1–5 / Remove Color** (also in the tab context menu): upstream individual tab colours, the
+  buffer's colour id (`Buffer::setDocColorId`), saved in sessions (`tabColourId`) and restored. `DocTabView` draws an
+  inactive coloured tab with its colour (translucent over the stylesheet tab, so the label stays readable) and the
+  bar of the active tab in the saturated colour, with upstream's light / dark hues. The Document List rows have the
+  colour as background.
+- **Menu colour samples** (upstream `setupColorSampleBitmapsOnMainMenuItems`): the Search › Mark style items and the
+  tab colour items show their colours; they follow the Style Configurator (WM_UPDATEMAINMENUBITMAPS) and dark mode.
+- **Tests:** `tst_tools` `tabColours`, and `saveAndLoadSession` keeps a tab colour. 17/17 suites pass.
+
 ## Session 15 (2026‑10‑25): Phase 7 done — Find characters in range, Edit Popup ContextMenu, theme import, sessions
 
 - **Search › Find characters in range…** (`ui/FindCharsInRange.*`, port of upstream
@@ -222,7 +233,7 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 3/4 leftovers | Search › Incremental Search (Ctrl+Alt+I); View › Tab › Apply Color 1–5, Remove Color |
+| 3/4 leftovers | Search › Incremental Search (Ctrl+Alt+I) |
 | 8 | File › Print… (Ctrl+P), Print Now; View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |

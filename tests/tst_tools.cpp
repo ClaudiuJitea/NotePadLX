@@ -32,6 +32,8 @@
 
 #include <cstdlib>
 
+#include "DocTabView.h"
+#include "NppDarkMode.h"
 #include "Notepad_plus.h"
 #include "Parameters.h"
 #include "QtUiServices.h"
@@ -464,6 +466,9 @@ private slots:
 		const BufferID idA = _npp->doOpen(a.toStdWString());
 		const BufferID idB = _npp->doOpen(b.toStdWString());
 		QVERIFY(idA != BUFFER_INVALID && idB != BUFFER_INVALID);
+		_npp->switchToFile(idB);
+		_npp->command(IDM_VIEW_TAB_COLOUR_3); // b is the current document: its tab colour is kept in the session
+		QCOMPARE(idB->getDocColorId(), 2);
 
 		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
 		nppGUI._definedSessionExt = L"npp-session";
@@ -479,6 +484,7 @@ private slots:
 		const QByteArray xml = saved.readAll();
 		QVERIFY(xml.contains("session-a.txt"));
 		QVERIFY(xml.contains("session-b.txt"));
+		QVERIFY(xml.contains("tabColourId=\"2\""));
 
 		_npp->fileCloseAll(false);
 		QCOMPARE(MainFileManager.getBufferFromName(a.toStdWString().c_str()), BUFFER_INVALID);
@@ -486,9 +492,49 @@ private slots:
 		_npp->command(IDM_FILE_LOADSESSION);
 		_ui._fileAnswer.clear();
 		QVERIFY(MainFileManager.getBufferFromName(a.toStdWString().c_str()) != BUFFER_INVALID);
-		QVERIFY(MainFileManager.getBufferFromName(b.toStdWString().c_str()) != BUFFER_INVALID);
+		const BufferID loadedB = MainFileManager.getBufferFromName(b.toStdWString().c_str());
+		QVERIFY(loadedB != BUFFER_INVALID);
+		QCOMPARE(loadedB->getDocColorId(), 2);
 		nppGUI._definedSessionExt.clear();
 		_npp->fileCloseAll(false);
+	}
+
+	void tabColours()
+	{
+		// View > Tab > Apply Color 1-5 / Remove Color (upstream individual tab colours)
+		for (int id = IDM_VIEW_TAB_COLOUR_NONE; id <= IDM_VIEW_TAB_COLOUR_5; ++id)
+			QVERIFY(Notepad_plus::isCommandPorted(id));
+		_npp->command(IDM_FILE_NEW);
+		DocTabView* tabs = _npp->getDocTab(MAIN_VIEW);
+		const int index = tabs->getCurrentTabIndex();
+		QCOMPARE(tabs->getIndividualTabColourId(index), -1);
+		_npp->command(IDM_VIEW_TAB_COLOUR_1);
+		QCOMPARE(tabs->getIndividualTabColourId(index), 0);
+		_npp->command(IDM_VIEW_TAB_COLOUR_5);
+		QCOMPARE(tabs->getIndividualTabColourId(index), 4);
+
+		// the coloured tab is drawn with its colour when it is not the active one
+		_npp->command(IDM_FILE_NEW);
+		QCoreApplication::processEvents();
+		const QImage img = tabs->grab().toImage();
+		const QRect r = tabs->tabRect(index);
+		const COLORREF c = NppParameters::getInstance().getIndividualTabColor(4, NppDarkMode::isEnabled(), false);
+		const QColor pixel = img.pixelColor(r.left() + 3, r.center().y());
+		const QColor tabColour(GetRValue(c), GetGValue(c), GetBValue(c));
+		QVERIFY2(qAbs(pixel.hue() - tabColour.hue()) < 25, qPrintable(pixel.name() + QLatin1Char(' ') + tabColour.name()));
+		_npp->command(IDM_FILE_CLOSE);
+
+		_npp->command(IDM_VIEW_TAB_COLOUR_NONE);
+		QCOMPARE(tabs->getIndividualTabColourId(index), -1);
+
+		// the menu items show the colour samples (upstream SetMenuItemBitmaps)
+		for (QAction* a : _npp->findChildren<QAction*>())
+		{
+			const int id = a->data().toInt();
+			if ((id >= IDM_VIEW_TAB_COLOUR_1 && id <= IDM_VIEW_TAB_COLOUR_5) || id == IDM_SEARCH_GONEXTMARKER1)
+				QVERIFY2(!a->icon().isNull(), qPrintable(a->text()));
+		}
+		_npp->command(IDM_FILE_CLOSE);
 	}
 
 	void editPopupContextMenu()

@@ -128,6 +128,7 @@ private:
 	void selectCurrentItem();
 	void ensureVisibleCurrentItem() const;
 	void fillItem(QTreeWidgetItem* item, const std::wstring& fullPath, int status) const;
+	void colourItem(QTreeWidgetItem* item, int docColor) const; // upstream: the row background of a tab colour
 	void rebuildRows(); // the rows of _items in the widget, with the view separator
 	void resizeColumns();
 

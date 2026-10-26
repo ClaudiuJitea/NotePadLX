@@ -21,9 +21,12 @@
 
 #include <QBoxLayout>
 #include <QMouseEvent>
+#include <QPainter>
+#include <QPaintEvent>
 #include <QStyle>
 #include <QVariant>
 
+#include "NppDarkMode.h"
 #include "Parameters.h"
 
 namespace
@@ -133,6 +136,60 @@ void DocTabView::updateCloseButtons()
 	{
 		if (QWidget* button = tabButton(i, side))
 			button->setVisible(onInactiveTabs || i == currentIndex());
+	}
+}
+
+void DocTabView::setIndividualTabColour(BufferID bufferId, int colorId)
+{
+	if (bufferId != BUFFER_INVALID)
+		bufferId->setDocColorId(colorId);
+}
+
+int DocTabView::getIndividualTabColourId(int tabIndex) const
+{
+	BufferID bufferId = getBufferByIndex(static_cast<size_t>(tabIndex));
+	if (bufferId == BUFFER_INVALID)
+		return -1;
+
+	return bufferId->getDocColorId();
+}
+
+void DocTabView::paintEvent(QPaintEvent* event)
+{
+	QTabBar::paintEvent(event);
+
+	// upstream TabBarPlus::drawItem: an inactive tab is filled with its individual colour, the active one has the
+	// top bar in the saturated colour. NPLX: the stylesheet draws the tabs, the colours are drawn over them (a
+	// translucent fill keeps the label readable)
+	NppParameters& nppParam = NppParameters::getInstance();
+	const bool isDarkMode = NppDarkMode::isEnabled();
+	const bool drawTopBar = nppParam.getNppGUI()._tabStatus & TAB_DRAWTOPBAR;
+	const bool isVertical = (shape() == QTabBar::RoundedWest);
+	QPainter painter(this);
+	for (int i = 0; i < count(); ++i)
+	{
+		const int colourId = getIndividualTabColourId(i);
+		if (colourId < 0)
+			continue;
+		const QRect r = tabRect(i);
+		if (!r.intersects(event->rect()))
+			continue;
+		const bool isSelected = (i == currentIndex());
+		const COLORREF c = nppParam.getIndividualTabColor(colourId, isDarkMode, isSelected);
+		QColor colour(GetRValue(c), GetGValue(c), GetBValue(c));
+		if (isSelected)
+		{
+			if (!drawTopBar)
+				continue;
+			const int barSize = 3;
+			painter.fillRect(isVertical ? QRect(r.right() - barSize + 1, r.top(), barSize, r.height())
+				: QRect(r.left(), r.bottom() - barSize + 1, r.width(), barSize), colour);
+		}
+		else
+		{
+			colour.setAlpha(isDarkMode ? 110 : 140);
+			painter.fillRect(r, colour);
+		}
 	}
 }
 

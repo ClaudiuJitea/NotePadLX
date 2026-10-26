@@ -62,6 +62,10 @@ public:
 	// upstream Buffer::refreshCompactFileName: the labels after a change of the label length
 	void refreshLabels();
 
+	// upstream individual tab colours (View > Tab > Apply Color 1-5): the colour id of the buffer, -1 for none
+	static void setIndividualTabColour(BufferID bufferId, int colorId);
+	int getIndividualTabColourId(int tabIndex) const;
+
 signals:
 	// The user clicked a tab (upstream: TCN_SELCHANGE handled by Notepad_plus)
 	void bufferSelected(BufferID id);
@@ -70,6 +74,7 @@ signals:
 
 protected:
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
+	void paintEvent(QPaintEvent* event) override;
 	void tabInserted(int index) override;
 
 private:

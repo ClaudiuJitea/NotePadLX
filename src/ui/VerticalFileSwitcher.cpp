@@ -27,6 +27,7 @@
 
 #include "NplxStyle.h"
 #include "NppConstants.h"
+#include "NppDarkMode.h"
 #include "Parameters.h"
 #include "localization.h"
 #include "menuCmdID.h"
@@ -252,6 +253,19 @@ void VerticalFileSwitcher::fillItem(QTreeWidgetItem* item, const std::wstring& f
 		item->setText(++colIndex, QString::fromStdWString(dirOf(fullPath)));
 }
 
+void VerticalFileSwitcher::colourItem(QTreeWidgetItem* item, int docColor) const
+{
+	// upstream NM_CUSTOMDRAW: the row of a coloured tab has its (light) colour as background
+	QBrush brush;
+	if (docColor >= 0)
+	{
+		const COLORREF c = NppParameters::getInstance().getIndividualTabColor(docColor, NppDarkMode::isEnabled(), false);
+		brush = QBrush(QColor(GetRValue(c), GetGValue(c), GetBValue(c)));
+	}
+	for (int col = 0; col < item->columnCount() || col == 0; ++col)
+		item->setBackground(col, brush);
+}
+
 void VerticalFileSwitcher::initList()
 {
 	NppParameters& nppParams = NppParameters::getInstance();
@@ -285,6 +299,7 @@ void VerticalFileSwitcher::initList()
 		auto* item = new QTreeWidgetItem();
 		item->setData(0, StatusRole, QVariant::fromValue<void*>(new TaskLstFnStatus(fileNameStatus)));
 		fillItem(item, fileNameStatus._fn, fileNameStatus._status);
+		colourItem(item, fileNameStatus._docColor);
 		_items.push_back(item);
 	}
 	rebuildRows();
@@ -396,12 +411,14 @@ void VerticalFileSwitcher::setItemIconStatus(BufferID bufferID)
 
 void VerticalFileSwitcher::setItemColor(BufferID bufferID)
 {
-	// NPLX_TODO(Phase 8): tab colours (upstream: the row background from getIndividualTabColor)
 	for (QTreeWidgetItem* item : _items)
 	{
 		TaskLstFnStatus* tlfs = statusOfItem(item);
 		if (tlfs->_bufID == bufferID)
+		{
 			tlfs->_docColor = bufferID->getDocColorId();
+			colourItem(item, tlfs->_docColor);
+		}
 	}
 }
 
@@ -431,10 +448,11 @@ void VerticalFileSwitcher::activateItem(BufferID bufferID, int iView)
 int VerticalFileSwitcher::add(BufferID bufferID, int iView)
 {
 	Buffer *buf = bufferID;
-	auto* tl = new TaskLstFnStatus(iView, 0, buf->getFullPathName(), statusOf(buf), (void *)bufferID, -1);
+	auto* tl = new TaskLstFnStatus(iView, 0, buf->getFullPathName(), statusOf(buf), (void *)bufferID, buf->getDocColorId());
 	auto* item = new QTreeWidgetItem();
 	item->setData(0, StatusRole, QVariant::fromValue<void*>(tl));
 	fillItem(item, tl->_fn, tl->_status);
+	colourItem(item, tl->_docColor);
 	_items.push_back(item);
 	rebuildRows();
 
