@@ -196,8 +196,8 @@ BOOL PathIsNetworkPath(const wchar_t* path);
 // NPLX: replacement for PathCompactPathEx: shortens a path/file name to maxLen characters with "..."
 std::wstring pathCompact(const std::wstring& path, size_t maxLen);
 
-// NPLX_TODO(Phase 3): elevated file operations (upstream: UAC via "notepad++.exe #UAC-...#").
-// Returns an errno value; currently always EACCES (no elevation helper yet).
+// Upstream: elevated file operations (UAC via "notepad++.exe #UAC-...#"). NPLX: the operation runs through pkexec;
+// returns NO_ERROR or an errno value (ECANCELED when the password dialog is dismissed).
 DWORD invokeNppUacOp(const std::wstring& strCmdLineParams);
 
 // NPLX: upstream variants take a timeout for network paths; on Linux stat() is used directly.

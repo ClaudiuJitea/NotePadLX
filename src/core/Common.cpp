@@ -29,11 +29,16 @@
 #include <system_error>
 #include <sys/stat.h>
 #include <sys/statfs.h>
+#include <spawn.h>
 #include <sys/statvfs.h>
+#include <sys/wait.h>
 #include <thread>
 #include <unistd.h>
 
+extern char** environ;
+
 #include "Encoding.h"
+#include "NppConstants.h"
 #include "FileInterface.h"
 
 namespace fs = std::filesystem;
@@ -1325,7 +1330,10 @@ BOOL GetFileAttributesEx(const wchar_t* path, GET_FILEEX_INFO_LEVELS, WIN32_FILE
 	DWORD attr = 0;
 	if (S_ISDIR(st.st_mode))
 		attr |= FILE_ATTRIBUTE_DIRECTORY;
-	if (::access(nativePath.c_str(), W_OK) != 0 && errno != ENOENT)
+	// NPLX: the Windows read-only attribute is a file without any write permission (what Edit > Read-Only Attribute in
+	// File System sets), or on a read-only file system. A file that only another user (root) may write is like one
+	// protected by Windows permissions: editable, and saved elevated (invokeNppUacOp)
+	if ((st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)) == 0 || (::access(nativePath.c_str(), W_OK) != 0 && errno == EROFS))
 		attr |= FILE_ATTRIBUTE_READONLY;
 	const wchar_t* fileName = PathFindFileName(path);
 	if (fileName && fileName[0] == L'.' && fileName[1] != L'\0' && !(fileName[1] == L'.' && fileName[2] == L'\0'))
@@ -1453,7 +1461,120 @@ BOOL PathIsNetworkPath(const wchar_t* path)
 	}
 }
 
-DWORD invokeNppUacOp(const std::wstring&)
+namespace
 {
-	return EACCES;
+	// SIGN "arg1" "arg2" (upstream builds the elevated command line this way)
+	std::vector<std::wstring> splitUacCmdLine(const std::wstring& cmdLine)
+	{
+		std::vector<std::wstring> args;
+		size_t i = 0;
+		while (i < cmdLine.size())
+		{
+			while (i < cmdLine.size() && cmdLine[i] == L' ')
+				++i;
+			if (i >= cmdLine.size())
+				break;
+			std::wstring arg;
+			if (cmdLine[i] == L'"')
+			{
+				const size_t end = cmdLine.find(L'"', i + 1);
+				arg = cmdLine.substr(i + 1, end == std::wstring::npos ? std::wstring::npos : end - i - 1);
+				i = end == std::wstring::npos ? cmdLine.size() : end + 1;
+			}
+			else
+			{
+				const size_t end = cmdLine.find(L' ', i);
+				arg = cmdLine.substr(i, end == std::wstring::npos ? std::wstring::npos : end - i);
+				i = end == std::wstring::npos ? cmdLine.size() : end;
+			}
+			args.push_back(std::move(arg));
+		}
+		return args;
+	}
+
+	std::string systemTool(const char* name)
+	{
+		for (const char* dir : { "/usr/bin/", "/bin/" })
+		{
+			const std::string path = std::string(dir) + name;
+			if (::access(path.c_str(), X_OK) == 0)
+				return path;
+		}
+		return name;
+	}
+}
+
+DWORD invokeNppUacOp(const std::wstring& strCmdLineParams)
+{
+	// NPLX: upstream starts "notepad++.exe #UAC-...# args" elevated (the UAC prompt) and waits for its exit code. On
+	// Linux only the operation runs elevated, through pkexec (polkit asks for the password): cp, mv or touch.
+	// NPLX_ELEVATE replaces pkexec (tests, or e.g. "sudo -A").
+	if ((strCmdLineParams.length() == 0) || (strCmdLineParams.length() > (UINT16_MAX / sizeof(wchar_t))))
+		return ERROR_INVALID_PARAMETER;
+
+	const std::vector<std::wstring> args = splitUacCmdLine(strCmdLineParams);
+	if (args.empty())
+		return ERROR_INVALID_PARAMETER;
+
+	std::vector<std::string> argv;
+	const char* elevate = std::getenv("NPLX_ELEVATE");
+	argv.push_back(elevate && elevate[0] ? elevate : systemTool("pkexec"));
+	const std::wstring& sign = args[0];
+	if (sign == NPP_UAC_SAVE_SIGN && args.size() == 3)
+	{
+		// upstream nppUacSave: CopyFile, as a move would keep the permissions of the temporary file; cp onto an existing
+		// file keeps its owner and mode
+		argv.insert(argv.end(), { systemTool("cp"), "--", nplx::toNativePath(args[1]), nplx::toNativePath(args[2]) });
+	}
+	else if (sign == NPP_UAC_MOVEFILE_SIGN && args.size() == 3)
+	{
+		argv.insert(argv.end(), { systemTool("mv"), "-f", "-T", "--", nplx::toNativePath(args[1]), nplx::toNativePath(args[2]) });
+	}
+	else if (sign == NPP_UAC_CREATEEMPTYFILE_SIGN && args.size() == 2)
+	{
+		argv.insert(argv.end(), { systemTool("touch"), "--", nplx::toNativePath(args[1]) });
+	}
+	else
+	{
+		return ERROR_INVALID_PARAMETER; // NPP_UAC_SETFILEATTRIBUTES_SIGN: no Windows attributes on Linux
+	}
+
+	std::vector<char*> cargv;
+	for (std::string& a : argv)
+		cargv.push_back(a.data());
+	cargv.push_back(nullptr);
+
+	pid_t pid = 0;
+	if (::posix_spawnp(&pid, cargv[0], nullptr, nullptr, cargv.data(), environ) != 0)
+		return ENOENT; // no pkexec
+
+	// wait for the elevated operation to finish (upstream: WaitForSingleObject INFINITE)
+	int status = 0;
+	while (::waitpid(pid, &status, 0) < 0)
+	{
+		if (errno != EINTR)
+			return static_cast<DWORD>(errno);
+	}
+	if (!WIFEXITED(status))
+		return EINTR;
+
+	DWORD dwError = NO_ERROR;
+	switch (WEXITSTATUS(status))
+	{
+		case 0:
+			break;
+		case 126: // pkexec: the authentication dialog was dismissed
+			dwError = ECANCELED;
+			break;
+		case 127: // pkexec: not authorized
+			dwError = EACCES;
+			break;
+		default: // the tool failed
+			dwError = EIO;
+			break;
+	}
+
+	if (sign == NPP_UAC_SAVE_SIGN && dwError == NO_ERROR)
+		nplx::deleteFile(args[1]); // the temporary copy (upstream: deleted by the elevated process)
+	return dwError;
 }

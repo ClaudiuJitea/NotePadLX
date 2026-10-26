@@ -143,6 +143,7 @@ union LARGE_INTEGER
 // NPLX: ported code stores errno values where upstream stores GetLastError() codes
 #define ERROR_ACCESS_DENIED  EACCES
 #define ERROR_FILE_NOT_FOUND ENOENT
+#define ERROR_INVALID_PARAMETER EINVAL
 
 // ---------------------------------------------------------------------------
 // Colours / words

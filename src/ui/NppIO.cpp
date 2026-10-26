@@ -527,8 +527,9 @@ bool Notepad_plus::doSave(BufferID id, const wchar_t* filename, bool isCopy)
 		}
 		else
 		{
-			// NPLX: upstream offers to restart Notepad++ as Administrator (UAC).
-			// NPLX_TODO(Phase 3): elevated save through pkexec; for now explain why it failed.
+			// NPLX: upstream offers to restart Notepad++ as Administrator (UAC). A file NotePadLX may not write is saved
+			// through pkexec by FileManager::saveBuffer (invokeNppUacOp); what is left here cannot be solved by that
+			// (read-only file system, a directory...)
 			const wstring reason = string2wstring(std::strerror(errno));
 			const wstring msg = L"Cannot save \"" + wstring(filename) + L"\":\n" + reason;
 			NppDarkMode::darkMessageBoxW(msg.c_str(), L"Save failed", MB_OK | MB_ICONWARNING);

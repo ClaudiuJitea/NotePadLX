@@ -29,6 +29,7 @@
 
 #include <cstdlib>
 #include <fstream>
+#include <unistd.h>
 
 #include "Buffer.h"
 #include "DocTabView.h"
@@ -607,6 +608,59 @@ private slots:
 		QVERIFY(fromSession != BUFFER_INVALID);
 
 		nppGUI._definedSessionExt = sessionExt;
+	}
+
+	void saveWithAdminRights()
+	{
+		// upstream: a file the user may not write is saved elevated (the temporary copy, then "#UAC-SAVE#");
+		// NPLX: through pkexec, here a stand-in that makes the file writable first
+		if (::geteuid() == 0)
+			QSKIP("root can write any file");
+		// a file someone else may write but not us (r--rw-r--, as root's 644 files are for a user): editable, and saved
+		// elevated. A test cannot own a file of another user, so the group's write bit stands for that someone.
+		const QString path = _tmp.path() + "/protected.conf";
+		writeFile(path, "old\n");
+		QFile::setPermissions(path, QFileDevice::ReadOwner | QFileDevice::ReadGroup | QFileDevice::WriteGroup | QFileDevice::ReadOther);
+
+		const QString log = _tmp.path() + "/elevate.log";
+		auto writeScript = [&](const QString& name, const QByteArray& body) {
+			const QString script = _tmp.path() + "/" + name;
+			writeFile(script, "#!/bin/sh\necho \"$@\" >> '" + log.toUtf8() + "'\n" + body);
+			QFile::setPermissions(script, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+			return script;
+		};
+		const QString grant = writeScript("grant.sh", "for last; do :; done\nchmod u+w \"$last\"\nexec \"$@\"\n");
+		const QString refuse = writeScript("refuse.sh", "exit 126\n");
+
+		BufferID id = _npp->doOpen(path.toStdWString());
+		QVERIFY(id != BUFFER_INVALID);
+		QVERIFY(_npp->switchToFile(id));
+		currentView()->execute(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>("new\n"));
+		QVERIFY(id->isDirty());
+
+		// the password dialog dismissed: not saved, the reason is shown
+		::setenv("NPLX_ELEVATE", refuse.toUtf8().constData(), 1);
+		const int messages = _ui._count;
+		QVERIFY(!_npp->fileSave(id));
+		QVERIFY(id->isDirty());
+		QCOMPARE(_ui._count, messages + 1);
+
+		// granted: saved, the temporary copy removed
+		::setenv("NPLX_ELEVATE", grant.toUtf8().constData(), 1);
+		QVERIFY(_npp->fileSave(id));
+		::unsetenv("NPLX_ELEVATE");
+		QVERIFY(!id->isDirty());
+		QFile f(path);
+		QVERIFY(f.open(QIODevice::ReadOnly));
+		QCOMPARE(f.readAll(), QByteArray("new\n"));
+
+		QFile logFile(log);
+		QVERIFY(logFile.open(QIODevice::ReadOnly));
+		const QList<QByteArray> calls = logFile.readAll().trimmed().split('\n');
+		QCOMPARE(calls.size(), 2);
+		QVERIFY2(calls[1].contains("cp -- ") && calls[1].endsWith(" " + path.toUtf8()), calls[1].constData());
+		const QByteArray tempFile = calls[1].split(' ').at(2);
+		QVERIFY2(!QFile::exists(QString::fromUtf8(tempFile)), tempFile.constData());
 	}
 
 	void firstLineAsTabName()
