@@ -534,6 +534,54 @@ private slots:
 		QCOMPARE(tabOf(_npp->currentView())->nbItem(), before - 1);
 	}
 
+	void htmlXmlDeclaredEncoding()
+	{
+		// upstream getHtmlXmlEncoding: the encoding an XML header or an HTML Content-Type meta declares
+		const QString xmlPath = _tmp.path() + "/latin.xml";
+		writeFile(xmlPath, "<?xml version=\"1.0\" encoding=\"ISO-8859-2\"?>\n<a>caf\xe9</a>\n");
+		BufferID xml = _npp->doOpen(xmlPath.toStdWString());
+		QVERIFY(xml != BUFFER_INVALID);
+		QCOMPARE(xml->getEncoding(), 28592);
+		QVERIFY(_npp->switchToFile(xml));
+		QVERIFY(QString::fromStdString(currentView()->getText()).contains(QStringLiteral("caf\u00e9")));
+
+		const QString htmlPath = _tmp.path() + "/latin.html";
+		writeFile(htmlPath, "<html><head><meta http-equiv=\"Content-Type\" content=\"text/html; charset=ISO-8859-1\"></head>"
+			"<body>gar\xe7on</body></html>\n");
+		BufferID html = _npp->doOpen(htmlPath.toStdWString());
+		QVERIFY(html != BUFFER_INVALID);
+		QCOMPARE(html->getEncoding(), 28591);
+
+		// no declaration: the usual detection
+		const QString plainPath = _tmp.path() + "/plain.xml";
+		writeFile(plainPath, "<a>plain</a>\n");
+		BufferID plain = _npp->doOpen(plainPath.toStdWString());
+		QVERIFY(plain != BUFFER_INVALID);
+		QCOMPARE(plain->getEncoding(), -1);
+	}
+
+	void sessionFileOpensAsSession()
+	{
+		// upstream doOpen: a file with the session extension of Preferences > MISC. is loaded as a session
+		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+		const std::wstring sessionExt = nppGUI._definedSessionExt;
+		nppGUI._definedSessionExt = L"nplxs";
+
+		const QString doc = _tmp.path() + "/in-session.txt";
+		writeFile(doc, "from the session\n");
+		const QString sessionPath = _tmp.path() + "/work.nplxs";
+		writeFile(sessionPath, ("<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n<NotepadPlus>\n<Session activeView=\"0\">\n"
+			"<mainView activeIndex=\"0\"><File filename=\"" + doc.toUtf8() + "\"/></mainView>\n<subView activeIndex=\"0\"/>\n"
+			"</Session>\n</NotepadPlus>\n"));
+
+		QCOMPARE(_npp->doOpen(sessionPath.toStdWString()), BUFFER_INVALID); // not opened as a document
+		QVERIFY(MainFileManager.getBufferFromName(sessionPath.toStdWString().c_str()) == BUFFER_INVALID);
+		BufferID fromSession = MainFileManager.getBufferFromName(doc.toStdWString().c_str());
+		QVERIFY(fromSession != BUFFER_INVALID);
+
+		nppGUI._definedSessionExt = sessionExt;
+	}
+
 	void rightButtonWheelSwitchesDocuments()
 	{
 		// upstream WM_MOUSEWHEEL with MK_RBUTTON: the previous / next document, and no context menu on the release

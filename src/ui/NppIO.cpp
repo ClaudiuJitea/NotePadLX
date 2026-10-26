@@ -30,6 +30,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QDir>
+#include <QFile>
 #include <QFileDialog>
 #include <QInputDialog>
 #include <QMimeData>
@@ -39,8 +40,10 @@
 #include <QTimer>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QRegularExpression>
 
 #include "DocTabView.h"
+#include "EncodingMapper.h"
 #include "Parameters.h"
 #include "Printer.h"
 #include "ScintillaEditView.h"
@@ -131,7 +134,20 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 		return foundBufID;
 	}
 
-	// NPLX_TODO(Phase 3): session files (fileLoadSession) and workspace files (Project Panel, Phase 6)
+	if (isFileSession(longFileName) && longFileNameExists)
+	{
+		fileLoadSession(longFileName);
+		return BUFFER_INVALID;
+	}
+
+	if (isFileWorkspace(longFileName) && longFileNameExists)
+	{
+		nppParam.setWorkSpaceFilePath(0, longFileName);
+		// This line switches to Project Panel 1 while starting up Npp
+		// and after dragging a workspace file to Npp:
+		launchProjectPanel(IDM_VIEW_PROJECT_PANEL_1, &_pProjectPanel_1, 0);
+		return BUFFER_INVALID;
+	}
 
 	bool globbing = (wcsrchr(longFileName, wchar_t('*')) || wcsrchr(longFileName, wchar_t('?')));
 
@@ -197,7 +213,10 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 		}
 	}
 
-	// NPLX_TODO(Phase 3): encoding = getHtmlXmlEncoding(longFileName) when encoding == -1
+	if (encoding == -1)
+	{
+		encoding = getHtmlXmlEncoding(longFileName);
+	}
 
 	BufferID buffer;
 	if (isSnapshotMode)
@@ -1703,4 +1722,74 @@ void Notepad_plus::createMonitoringThread(Buffer* pBuf)
 			rateLimit->start();
 	});
 	_monitors[pBuf] = watcher;
+}
+
+int Notepad_plus::getHtmlXmlEncoding(const wchar_t* fileName) const
+{
+	// upstream Notepad_plus::getHtmlXmlEncoding. NPLX: the same POSIX expressions on the first block of the file with
+	// QRegularExpression, in place of SCI_SEARCHINTARGET on _invisibleEditView
+
+	// Get Language type
+	const wchar_t* ext = PathFindExtension(fileName);
+	if (*ext == '.') //extension found
+	{
+		ext += 1;
+	}
+	else
+	{
+		return -1;
+	}
+	NppParameters& nppParamInst = NppParameters::getInstance();
+	LangType langT = nppParamInst.getLangFromExt(ext);
+
+	if ((langT != L_XML) && (langT != L_HTML))
+		return -1;
+
+	// Get the beginning of file data
+	QFile f(QString::fromStdWString(fileName));
+	if (!f.open(QIODevice::ReadOnly))
+		return -1;
+	const int blockSize = 1024; // To ensure that length is long enough to capture the encoding in html
+	const QString data = QString::fromLatin1(f.read(blockSize));
+
+	// each expression searches inside the match of the previous one, as SCI_SEARCHINTARGET in the found target
+	auto narrow = [](const QString& text, const char* re, QString& match) {
+		const QRegularExpressionMatch m = QRegularExpression(QString::fromLatin1(re)).match(text);
+		if (!m.hasMatch())
+			return false;
+		match = m.captured(0);
+		return true;
+	};
+
+	QString found;
+	const size_t encodingStrLen = 128;
+	if (langT == L_XML)
+	{
+		const char* xmlHeaderRegExpr = "<\\?xml[ \\t]+version[ \\t]*=[ \\t]*\"[^\"]+\"[ \\t]+encoding[ \\t]*=[ \\t]*\"[^\"]+\"[ \\t]*.*?>";
+		const char* encodingBlockRegExpr = "encoding[ \\t]*=[ \\t]*\"[^\".]+\"";
+		const char* encodingRegExpr = "\".+\"";
+		const char* encodingAliasRegExpr = "[a-zA-Z0-9_-]+";
+		if (!narrow(data, xmlHeaderRegExpr, found) || !narrow(found, encodingBlockRegExpr, found)
+			|| !narrow(found, encodingRegExpr, found) || !narrow(found, encodingAliasRegExpr, found))
+			return -1;
+	}
+	else // if (langT == L_HTML)
+	{
+		const char* htmlHeaderRegExpr  = "<meta[ \\t]+http-equiv[ \\t]*=[ \\t\"']*Content-Type[ \\t\"']*content[ \\t]*= *[\"']text/html;[ \\t]+charset[ \\t]*=[ \\t]*.+[\"'] */*>";
+		const char* htmlHeaderRegExpr2 = "<meta[ \\t]+content[ \\t]*= *[\"']text/html;[ \\t]+charset[ \\t]*=[ \\t]*.+[ \\t\"']http-equiv[ \\t]*=[ \\t\"']*Content-Type[ \\t\"']*/*>";
+		const char* charsetBlock = "charset[ \\t]*=[ \\t]*[^\"']+";
+		const char* intermediaire = "=[ \\t]*.+";
+		const char* encodingStrRE = "[^ \\t=]+";
+		if (!narrow(data, htmlHeaderRegExpr, found) && !narrow(data, htmlHeaderRegExpr2, found))
+			return -1;
+		if (!narrow(found, charsetBlock, found) || !narrow(found, intermediaire, found) || !narrow(found, encodingStrRE, found))
+			return -1;
+	}
+
+	if (static_cast<size_t>(found.size()) >= encodingStrLen)
+		return -1;
+
+	const EncodingMapper& em = EncodingMapper::getInstance();
+	int enc = em.getEncodingFromString(found.toLatin1().constData());
+	return (enc == CP_ACP ? -1 : enc);
 }

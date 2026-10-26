@@ -213,6 +213,7 @@ public:
 	void saveSession(const Session& session);
 	void getCurrentOpenedFiles(Session& session, bool includeUntitledDoc = false);
 	bool isFileSession(const wchar_t* filename);
+	int getHtmlXmlEncoding(const wchar_t* fileName) const; // upstream: the encoding an XML or HTML header declares
 	bool isFileWorkspace(const wchar_t* filename);
 	std::wstring getLangFromMenu(const Buffer* buf);
 	int getLangFromMenuName(const wchar_t* langName);
