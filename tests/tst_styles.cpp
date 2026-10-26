@@ -27,6 +27,7 @@
 #include <QTemporaryDir>
 #include <QTimer>
 #include <QDockWidget>
+#include <QLabel>
 #include <QPushButton>
 
 #include <cstdlib>
@@ -45,6 +46,8 @@
 #include "UserDefineResource.h"
 #include "WordStyleDlg.h"
 #include "WordStyleDlgRes.h"
+#include "preferenceDlg.h"
+#include "preference_rc.h"
 #include "localization.h"
 #include "menuCmdID.h"
 
@@ -197,6 +200,36 @@ private slots:
 			QVERIFY(NppDarkMode::advDefaults(false)._xmlFileName.empty());
 		QCOMPARE(NppDarkMode::advDefaults(!isDark)._xmlFileName, otherMode); // the other mode keeps its theme
 		_npp->command(IDM_LANGSTYLE_CONFIG_DLG);
+	}
+
+	void goToSettingsLink()
+	{
+		// upstream IDC_GLOBAL_GOTOSETTINGS_LINK: some global styles have their setting in Preferences
+		_npp->command(IDM_LANGSTYLE_CONFIG_DLG);
+		auto* link = qobject_cast<QLabel*>(dlg()->dlgItem(IDC_GLOBAL_GOTOSETTINGS_LINK));
+		QVERIFY(link);
+		QVERIFY(dlg()->goToSection(L"Global Styles:Default Style"));
+		QVERIFY(link->isHidden());
+
+		struct { const wchar_t* _section; const wchar_t* _page; int _ctrl; } const cases[] = {
+			{ L"Global Styles:Edge colour", L"MarginsBorderEdge", IDC_COLUMNPOS_EDIT },
+			{ L"Global Styles:Smart Highlighting", L"Highlighting", IDC_CHECK_ENABLSMARTHILITE },
+			{ L"Global Styles:URL hovered", L"Cloud", IDC_CHECK_CLICKABLELINK_ENABLE },
+			{ L"Global Styles:Inactive tabs", L"Tabbar", IDC_CHECK_DRAWINACTIVE },
+		};
+		for (const auto& c : cases)
+		{
+			QVERIFY2(dlg()->goToSection(c._section), qPrintable(QString::fromWCharArray(c._section)));
+			QVERIFY(!link->isHidden());
+			emit link->linkActivated(QStringLiteral("#"));
+			PreferenceDlg* pref = _npp->getPreferenceDlg();
+			QVERIFY(pref && pref->isVisible());
+			RcDialog* page = pref->pageByName(c._page);
+			QVERIFY2(page && page->isVisible(), qPrintable(QString::fromWCharArray(c._page)));
+			QVERIFY(page->dlgItem(c._ctrl));
+		}
+		_npp->getPreferenceDlg()->hide();
+		dlg()->command(IDCANCEL);
 	}
 
 	void editStyleAndCancel()

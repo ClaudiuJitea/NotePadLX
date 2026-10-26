@@ -44,6 +44,7 @@
 #include "NppDarkMode.h"
 #include "NppDarkModeOptions.h"
 #include "WordStyleDlgRes.h"
+#include "preference_rc.h"
 #include "localization.h"
 #include "resource.h"
 
@@ -256,8 +257,7 @@ void WordStyleDlg::create()
 		L"Enabling \"Global override\" here will override that parameter in all language styles. What you probably really want is to use the \"Default Style\" settings instead")));
 	globalGrid->addWidget(whatIsGlobalOverride, 3, 0);
 	auto* goToSettings = addLabel(IDC_GLOBAL_GOTOSETTINGS_LINK, QStringLiteral("<a href=\"#\">Go to settings</a>"));
-	goToSettings->setEnabled(false);
-	goToSettings->setToolTip(QStringLiteral("Not yet ported to NotePadLX")); // NPLX_TODO(Phase 7): Preferences dialog
+	connect(goToSettings, &QLabel::linkActivated, this, [this]() { command(IDC_GLOBAL_GOTOSETTINGS_LINK); });
 	keywordsGrid->addWidget(goToSettings, 2, 0);
 	styleLayout->addLayout(keywordsGrid);
 	styleLayout->addLayout(globalGrid);
@@ -496,6 +496,15 @@ void WordStyleDlg::command(int id)
 			// upstream: the theme is the one of the current mode (Preferences > Dark Mode switches between the two)
 			const std::wstring fn = PathFindFileName(_themeName.c_str());
 			NppDarkMode::setThemeName((!NppDarkMode::isEnabled() && fn == L"stylers.xml") ? L"" : fn);
+			return;
+		}
+
+		case IDC_GLOBAL_GOTOSETTINGS_LINK :
+		{
+			std::pair<intptr_t, intptr_t> pageAndCtrlID = goToPreferencesSettings();
+
+			if (pageAndCtrlID.first != -1)
+				_sendToParent(NPPM_INTERNAL_LAUNCHPREFERENCES, pageAndCtrlID.first, pageAndCtrlID.second);
 			return;
 		}
 
@@ -1087,8 +1096,130 @@ void WordStyleDlg::setStyleListFromLexer(int index)
 
 std::pair<intptr_t, intptr_t> WordStyleDlg::goToPreferencesSettings()
 {
-	// NPLX_TODO(Phase 7): the Preferences dialog; upstream maps some global styles to a Preferences page and control
-	return { -1, -1 };
+	std::pair<intptr_t, intptr_t> result;
+	result.first = -1;  // Page
+	result.second = -1; // Control
+
+	// NPLX: the order of the Preferences pages, without File Association (Windows only)
+	enum preferencesSectionPage {
+		general = 0,
+		toolbar,
+		tabbar,
+		edit1,
+		edit2,
+		darkMode,
+		margins,
+		newDocument,
+		defaultDirectory,
+		recentFileHistory,
+		language,
+		indentation,
+		highlighting,
+		print,
+		searching,
+		backup,
+		autoCompletion,
+		multiInstance,
+		delimiter,
+		performance,
+		cloudAndLink,
+		searchEngine,
+		misc
+	};
+
+	const Style& style = getCurrentStyler();
+
+	// Check if it's one of following Global Styles:
+	if (style._styleDesc == L"Current line background colour")
+	{
+		result.first = edit1;
+		result.second = IDC_RADIO_CLM_HILITE;
+	}
+	else if (style._styleDesc == L"Multi-edit carets color" || style._styleDesc == L"Multi-selected text color")
+	{
+		result.first = edit2;
+		result.second = IDC_CHECK_MULTISELECTION;
+	}
+	else if (style._styleDesc == L"Caret colour")
+	{
+		result.first = edit1;
+		result.second = IDC_CARETSETTING_STATIC;
+	}
+	else if (style._styleDesc == L"Edge colour")
+	{
+		result.first = margins;
+		result.second = IDC_COLUMNPOS_EDIT;
+	}
+	else if (style._styleDesc == L"Line number margin")
+	{
+		result.first = margins;
+		result.second = IDC_CHECK_LINENUMBERMARGE;
+	}
+	else if (style._styleDesc == L"Bookmark margin")
+	{
+		result.first = margins;
+		result.second = IDC_CHECK_BOOKMARKMARGE;
+	}
+	else if (style._styleDesc == L"Change History margin" || style._styleDesc == L"Change History modified"
+		|| style._styleDesc == L"Change History revert modified" || style._styleDesc == L"Change History revert origin"
+		|| style._styleDesc == L"Change History saved")
+	{
+		result.first = margins;
+		result.second = IDC_GB_CHANGHISTORY;
+	}
+	else if (style._styleDesc == L"Fold" || style._styleDesc == L"Fold active" || style._styleDesc == L"Fold margin")
+	{
+		result.first = margins;
+		result.second = IDC_FMS_GB_STATIC;
+	}
+	else if (style._styleDesc == L"Smart Highlighting")
+	{
+		result.first = highlighting;
+		result.second = IDC_CHECK_ENABLSMARTHILITE;
+	}
+	else if (style._styleDesc == L"Tags match highlighting")
+	{
+		result.first = highlighting;
+		result.second = IDC_CHECK_ENABLTAGSMATCHHILITE;
+	}
+	else if (style._styleDesc == L"Tags attribute")
+	{
+		result.first = highlighting;
+		result.second = IDC_CHECK_ENABLTAGATTRHILITE;
+	}
+	else if (style._styleDesc == L"Mark Style 1" || style._styleDesc == L"Mark Style 2" || style._styleDesc == L"Mark Style 3"
+		|| style._styleDesc == L"Mark Style 4" || style._styleDesc == L"Mark Style 5")
+	{
+		result.first = highlighting;
+		result.second = IDC_MARKALL_STATIC;
+	}
+	else if (style._styleDesc == L"URL hovered")
+	{
+		result.first = cloudAndLink;
+		result.second = IDC_CHECK_CLICKABLELINK_ENABLE;
+	}
+	else if (style._styleDesc == L"EOL custom color")
+	{
+		result.first = edit2;
+		result.second = IDC_CHECK_WITHCUSTOMCOLOR_CRLF;
+	}
+	else if (style._styleDesc == L"Active tab focused indicator" || style._styleDesc == L"Active tab unfocused indicator")
+	{
+		result.first = tabbar;
+		result.second = IDC_CHECK_ORANGE;
+	}
+	else if (style._styleDesc == L"Inactive tabs")
+	{
+		result.first = tabbar;
+		result.second = IDC_CHECK_DRAWINACTIVE;
+	}
+	else if (style._styleDesc == g_npcStyleName)
+	{
+		result.first = edit2;
+		result.second = IDC_CHECK_NPC_COLOR;
+	}
+
+	return result;
 }
 
 void WordStyleDlg::syncWithSelFgSingleColorCtrl()

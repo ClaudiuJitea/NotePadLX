@@ -29,6 +29,7 @@
 #include <QLabel>
 #include <QLayout>
 #include <QRadioButton>
+#include <QRegularExpression>
 #include <QTabBar>
 
 #include "FindReplaceDlg.h"
@@ -103,7 +104,15 @@ namespace nplx
 	{
 		const QString s = QString::fromStdWString(text);
 		if (auto* l = qobject_cast<QLabel*>(w))
-			l->setText(s);
+		{
+			// NPLX: a link label (upstream URLCtrl) stays a link
+			static const QRegularExpression linkRe(QStringLiteral("^<a href=\"([^\"]*)\">"));
+			const QRegularExpressionMatch link = linkRe.match(l->text());
+			if (link.hasMatch())
+				l->setText(QStringLiteral("<a href=\"%1\">%2</a>").arg(link.captured(1), s.toHtmlEscaped()));
+			else
+				l->setText(s);
+		}
 		else if (auto* b = qobject_cast<QAbstractButton*>(w))
 		{
 			b->setText(s);
