@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include "LocalizationQt.h"
 #include "preferenceDlg.h"
 
 #include <algorithm>
@@ -256,6 +257,9 @@ void PreferenceDlg::create()
 
 	makeCategoryList();
 	showDialogByIndex(0);
+
+	// upstream IDM_SETTING_PREFERENCE: changePreferenceDlgLang on first use
+	nplx::changePreferenceDlgLang(*this);
 }
 
 void PreferenceDlg::doDialog(bool isRTL)
@@ -539,21 +543,13 @@ void GeneralSubDlg::onCommand(int id, int notification)
 			const wstring langName = comboBox(IDC_COMBO_LOCALIZATION)->currentText().toStdWString();
 			if (!langName.empty())
 			{
-				// upstream: switch to English, then to the language, and reload the menus and dialogs
-				// (NPPM_INTERNAL_RELOADNATIVELANG). NPLX: switching at runtime is Phase 8; the language is used on
-				// the next start
+				// Make English as basic language
+				if (localizationSwitcher.switchToLang(L"English"))
+					sendToNpp(NPPM_INTERNAL_RELOADNATIVELANG, FALSE, 0);
+
+				// Change the language
 				if (localizationSwitcher.switchToLang(langName.c_str()))
-				{
 					sendToNpp(NPPM_INTERNAL_RELOADNATIVELANG, TRUE, 0);
-					static bool isFirstTime = true;
-					if (isFirstTime)
-					{
-						infoBox("Need2Restart2ChangeLocalization",
-							L"NotePadLX will use this language the next time it starts.",
-							L"Localization");
-						isFirstTime = false;
-					}
-				}
 			}
 			return;
 		}

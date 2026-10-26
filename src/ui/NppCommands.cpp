@@ -555,8 +555,7 @@ void Notepad_plus::command(int id)
 				_preference = new PreferenceDlg(this);
 				_preference->init([this](unsigned int message, uptr_t wParam, sptr_t lParam) { return nppMessage(message, wParam, lParam); });
 			}
-			_preference->doDialog(_nativeLangSpeaker.isRTL());
-			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changePreferenceDlgLang(_preference) on first use
+			_preference->doDialog(_nativeLangSpeaker.isRTL()); // translated when created (changePreferenceDlgLang)
 			break;
 		}
 
@@ -857,8 +856,7 @@ void Notepad_plus::command(int id)
 			_findReplaceDlg->setSearchTextWithSettings();
 
 			setFindReplaceFolderFilter(NULL, NULL);
-
-			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeFindReplaceDlgLang on first use
+			// upstream changeFindReplaceDlgLang on first use: done when the dialog is created
 			break;
 		}
 
@@ -1983,8 +1981,7 @@ void Notepad_plus::command(int id)
 
 			if (!udd->isCreated())
 			{
-				udd->doDialog(true, _nativeLangSpeaker.isRTL());
-				// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeUserDefineLang(udd)
+				udd->doDialog(true, _nativeLangSpeaker.isRTL()); // also changeUserDefineLang
 				if (_isUDDocked)
 					udd->command(IDC_DOCK_BUTTON);
 			}
@@ -2073,8 +2070,7 @@ void Notepad_plus::command(int id)
 			}
 			else
 			{
-				_configStyleDlg->doDialog(_nativeLangSpeaker.isRTL());
-				// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeConfigLang on first use
+				_configStyleDlg->doDialog(_nativeLangSpeaker.isRTL()); // also changeConfigLang on first use
 			}
 			break;
 		}

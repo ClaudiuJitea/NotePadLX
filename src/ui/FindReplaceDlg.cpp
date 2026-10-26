@@ -3151,6 +3151,9 @@ void FindReplaceDlg::create()
 	fillFindHistory();
 	initOptionsFromDlg();
 	_options._isInSelection = false;
+
+	// upstream: changeFindReplaceDlgLang the first time the dialog is shown (Find, Find in Files, Find in Projects...)
+	nplx::changeFindReplaceDlgLang(*this);
 }
 
 void FindReplaceDlg::fillFindHistory()
@@ -3374,6 +3377,14 @@ void FindReplaceDlg::doDialog(DIALOG_TYPE whichType, bool isRTL, bool toShow)
 	{
 		(*_ppEditView)->setFocus();
 	}
+}
+
+void FindReplaceDlg::changeTabName(DIALOG_TYPE index, const wchar_t* name2change)
+{
+	if (!_tab)
+		return;
+	_tab->setTabText(index, QString::fromWCharArray(name2change));
+	updateTitle();
 }
 
 void FindReplaceDlg::updateTitle()

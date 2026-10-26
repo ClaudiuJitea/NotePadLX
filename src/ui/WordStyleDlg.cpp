@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include "LocalizationQt.h"
 #include "WordStyleDlg.h"
 
 #include "DocumentMap.h" // ViewZoneDlg
@@ -354,6 +355,8 @@ void WordStyleDlg::doDialog(bool isRTL)
 			setLayoutDirection(Qt::RightToLeft);
 		create();
 		prepare2Cancel();
+		// upstream IDM_LANGSTYLE_CONFIG_DLG: changeConfigLang on first use
+		nplx::changeConfigLang(*this);
 	}
 
 	if (!isVisible())

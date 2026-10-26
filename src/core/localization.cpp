@@ -282,6 +282,36 @@ NppXml::Element NativeLangSpeaker::searchDlgNode(NppXml::Element node, const cha
 	return {};
 }
 
+std::vector<std::pair<MenuPosition, std::wstring>> NativeLangSpeaker::getMenuFolderNames() const
+{
+	std::vector<std::pair<MenuPosition, std::wstring>> names;
+	if (!_nativeLang) return names;
+	NppXml::Element mainMenu = NppXml::firstChildElement(_nativeLang, "Menu");
+	if (!mainMenu) return names;
+	mainMenu = NppXml::firstChildElement(mainMenu, "Main");
+	if (!mainMenu) return names;
+
+	WcharMbcsConvertor& wmc = WcharMbcsConvertor::getInstance();
+	struct { const char* _root; const char* _idAttr; } const folders[] = { { "Entries", "menuId" }, { "SubEntries", "subMenuId" } };
+	for (const auto& folder : folders)
+	{
+		NppXml::Element entriesRoot = NppXml::firstChildElement(mainMenu, folder._root);
+		for (NppXml::Element childNode = NppXml::firstChildElement(entriesRoot, "Item");
+			childNode;
+			childNode = NppXml::nextSiblingElement(childNode, "Item"))
+		{
+			const char* idStr = NppXml::attribute(childNode, folder._idAttr);
+			const char* name = NppXml::attribute(childNode, "name");
+			if (!idStr || !name)
+				continue;
+			const MenuPosition& menuPos = MenuPosition::getMenuPosition(idStr);
+			if (menuPos._x != -1)
+				names.emplace_back(menuPos, wmc.char2wchar(name, _nativeLangEncoding));
+		}
+	}
+	return names;
+}
+
 std::wstring NativeLangSpeaker::getSubMenuEntryName(const char* nodeName) const
 {
 	if (!_nativeLang) return L"";
@@ -449,6 +479,30 @@ bool NativeLangSpeaker::getDlgLang(const char* dlgTagName, DlgLang& out, const c
 	dlgNode = searchDlgNode(dlgNode, dlgTagName);
 	if (!dlgNode) return false;
 
+	readDlgLang(dlgNode, out, titleTag);
+	return true;
+}
+
+bool NativeLangSpeaker::getDlgLangByPath(std::initializer_list<const char*> path, DlgLang& out, const char* titleTag) const
+{
+	out = DlgLang{};
+
+	if (!_nativeLang) return false;
+
+	NppXml::Element dlgNode = NppXml::firstChildElement(_nativeLang, "Dialog");
+	for (const char* nodeName : path)
+	{
+		if (!dlgNode) return false;
+		dlgNode = NppXml::firstChildElement(dlgNode, nodeName);
+	}
+	if (!dlgNode) return false;
+
+	readDlgLang(dlgNode, out, titleTag);
+	return true;
+}
+
+void NativeLangSpeaker::readDlgLang(NppXml::Element dlgNode, DlgLang& out, const char* titleTag) const
+{
 	WcharMbcsConvertor& wmc = WcharMbcsConvertor::getInstance();
 
 	// Set Title
@@ -483,7 +537,6 @@ bool NativeLangSpeaker::getDlgLang(const char* dlgTagName, DlgLang& out, const c
 		}
 		out._comboBoxes.emplace_back(id, std::move(comboElms));
 	}
-	return true;
 }
 
 bool NativeLangSpeaker::getMsgBoxLang(const char* msgBoxTagName, std::wstring& title, std::wstring& message) const

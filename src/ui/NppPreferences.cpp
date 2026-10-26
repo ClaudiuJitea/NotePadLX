@@ -323,7 +323,7 @@ bool Notepad_plus::preferenceMessage(unsigned int message, uptr_t wParam, sptr_t
 
 		case NPPM_INTERNAL_RELOADNATIVELANG:
 		{
-			// NPLX_TODO(Phase 8): reloadLang() at runtime; the new nativeLang.xml is read at the next start
+			reloadLang();
 			return true;
 		}
 

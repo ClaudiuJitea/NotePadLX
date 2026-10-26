@@ -16,6 +16,8 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "Notepad_plus.h"
+
+#include "LocalizationQt.h"
 #include "VerticalFileSwitcher.h"
 #include "TaskListInfo.h"
 
@@ -80,6 +82,11 @@ using std::wstring;
 namespace
 {
 	std::mutex command_mutex;
+
+	// NPLX: on the menus of the menu bar, the upstream MenuPosition (a list of 1-3 ints) and the .rc text; on their
+	// actions the .rc text, so that a language can be applied again (reloadLang)
+	constexpr const char* menuPosProperty = "nplxMenuPos";
+	constexpr const char* rcTextProperty = "nplxRcText";
 
 	// Generated from upstream Notepad_plus.rc (tools/gen_mainmenu.py)
 	const NppMenuDef g_mainMenuDef[] = {
@@ -533,6 +540,7 @@ void Notepad_plus::init()
 	}
 
 	buildMainMenu();
+	changeMenuLang(); // the commands are translated as they are added, the menus here
 	buildToolBar();
 	placeIncrementalSearchBar();
 	hideExcludedLanguages();
@@ -757,6 +765,74 @@ QAction* Notepad_plus::actionFor(int id) const
 	return it == _actions.end() ? nullptr : it->second;
 }
 
+void Notepad_plus::changeMenuLang()
+{
+	// upstream NativeLangSpeaker::changeMenuLang: the menus by position (<Entries>, <SubEntries>), the commands by ID;
+	// what the language does not translate gets its .rc text back
+	const auto folderNames = _nativeLangSpeaker.getMenuFolderNames();
+	for (QMenu* menu : menuBar()->findChildren<QMenu*>())
+	{
+		const QList<QVariant> pos = menu->property(menuPosProperty).toList();
+		if (pos.isEmpty())
+			continue;
+		QString title = menu->property(rcTextProperty).toString();
+		for (const auto& [menuPos, name] : folderNames)
+		{
+			const QList<QVariant> namePos = menuPos._y == -1 ? QList<QVariant>{ menuPos._x }
+				: menuPos._z == -1 ? QList<QVariant>{ menuPos._x, menuPos._y }
+				: QList<QVariant>{ menuPos._x, menuPos._y, menuPos._z };
+			if (namePos == pos)
+				title = QString::fromStdWString(name);
+		}
+		menu->setTitle(title);
+	}
+
+	for (const auto& [id, action] : _actions)
+	{
+		const QVariant rcText = action->property(rcTextProperty);
+		if (!rcText.isValid())
+			continue; // a macro, a Run command, a user defined language...
+		QString text = QString::fromStdWString(_nativeLangSpeaker.getNativeLangMenuString(id, rcText.toString().toStdWString()));
+		// a Scintilla command shows its shortcut after a tab (updateScintillaShortcuts)
+		const qsizetype tab = action->text().indexOf(QLatin1Char('\t'));
+		if (tab >= 0)
+			text += action->text().mid(tab);
+		action->setText(text);
+	}
+}
+
+bool Notepad_plus::reloadLang()
+{
+	NppParameters& nppParam = NppParameters::getInstance();
+
+	if (!nppParam.reloadLang())
+		return false;
+
+	NppXml::Document nativeLangDocRoot = nppParam.getNativeLang();
+	if (nativeLangDocRoot == nullptr)
+		return false;
+
+	_nativeLangSpeaker.init(nativeLangDocRoot, true);
+
+	nppParam.reloadContextMenuFromXmlTree(_mainMenuHandle.get(), nullptr); // NPLX_TODO(Phase 9): plugins menu
+
+	changeMenuLang();
+
+	_nativeLangSpeaker.resetShortcutMenuNameMap();
+	updateCommandShortcuts();
+
+	// NPLX: the tab context menu is built with its names (showTabContextMenu), so it is built again when shown
+	_tabPopupMenu.destroy();
+
+	// upstream: changePreferenceDlgLang, changeConfigLang, changeFindReplaceDlgLang, changeDlgLang of GoToLine, Run,
+	// the hash dialogs, Run Macro, Incremental Search, Find characters in range, Column Editor, Debug Info and
+	// changeUserDefineLang, for the dialogs already created
+	nplx::retranslateDialogs();
+
+	updateTrayIconMenu();
+	return true;
+}
+
 void Notepad_plus::buildMainMenu()
 {
 	const NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
@@ -772,6 +848,10 @@ void Notepad_plus::buildMainMenu()
 	std::vector<QMenu*> menuStack;
 	int languageMenuCount = 0;
 	int skipDepth = 0;
+	// NPLX: the upstream (Win32) position of each entry, counting the items removed on Linux, so that a menu can be
+	// found by its MenuPosition (changeMenuLang)
+	std::vector<int> nextPos{ 0 };
+	QList<QVariant> menuPos;
 
 	for (const NppMenuDef& def : g_mainMenuDef)
 	{
@@ -816,12 +896,18 @@ void Notepad_plus::buildMainMenu()
 				{
 					menuStack.push_back(menuStack.back()->addMenu(QString::fromWCharArray(linuxPopupText(def._text))));
 				}
+				menuPos.push_back(nextPos.back()++);
+				nextPos.push_back(0);
+				menuStack.back()->setProperty(menuPosProperty, menuPos);
+				menuStack.back()->setProperty(rcTextProperty, menuStack.back()->title());
 				break;
 			}
 
 			case NppMenuDef::PopupEnd:
 				if (!menuStack.empty())
 				{
+					menuPos.pop_back();
+					nextPos.pop_back();
 					// NPLX: no trailing separator once Windows-only items are removed
 					const QList<QAction*> items = menuStack.back()->actions();
 					if (!items.isEmpty() && items.last()->isSeparator())
@@ -833,6 +919,7 @@ void Notepad_plus::buildMainMenu()
 			case NppMenuDef::Separator:
 				if (!menuStack.empty())
 				{
+					++nextPos.back();
 					// NPLX: no doubled separator once Windows-only items are removed
 					const QList<QAction*> items = menuStack.back()->actions();
 					if (!items.isEmpty() && !items.last()->isSeparator())
@@ -844,6 +931,7 @@ void Notepad_plus::buildMainMenu()
 			{
 				if (topLevel) // right-aligned tab-bar shortcuts, see above
 					break;
+				++nextPos.back();
 				if (isRemovedOnLinuxImpl(def._id))
 					break;
 
@@ -853,6 +941,7 @@ void Notepad_plus::buildMainMenu()
 				const wstring label = _nativeLangSpeaker.getNativeLangMenuString(def._id, rcText);
 				QAction* action = menuStack.back()->addAction(QString::fromStdWString(label));
 				action->setData(def._id);
+				action->setProperty(rcTextProperty, QString::fromStdWString(rcText));
 
 				QList<QKeySequence> keys;
 				for (auto [it, end] = shortcuts.equal_range(def._id); it != end; ++it)
@@ -2711,9 +2800,32 @@ void Notepad_plus::showTabContextMenu(int whichOne, const QPoint& globalPos)
 
 			// IMPORTANT: If any submenu entry is added/moved/removed, you have to change the value of tabCmSubMenuEntryPos[] in localization.cpp file
 		}
+
+		// upstream changeLangTabContextMenu: <Menu><TabBar>, the commands by CMDID and, for the default menu, the
+		// submenus by their index (CMDID 0-4)
+		static constexpr const wchar_t* subMenuNames[] = {
+			L"Close Multiple Tabs", L"Open into", L"Copy to Clipboard", L"Move Document", L"Apply Color to Tab",
+		};
+		const bool translateFolders = !nppParam.hasCustomTabContextMenu();
+		for (MenuItemUnit& item : itemUnitArray)
+		{
+			if (item._cmdID != 0 && !item._itemName.empty())
+				_nativeLangSpeaker.getAlternativeNameFromTabContextMenu(item._itemName, static_cast<int>(item._cmdID), false, std::wstring(item._itemName));
+			if (translateFolders && !item._parentFolderName.empty())
+			{
+				for (int i = 0; i < static_cast<int>(std::size(subMenuNames)); ++i)
+				{
+					if (item._parentFolderName == subMenuNames[i])
+					{
+						_nativeLangSpeaker.getAlternativeNameFromTabContextMenu(item._parentFolderName, i, false, subMenuNames[i]);
+						break;
+					}
+				}
+			}
+		}
+
 		_tabPopupMenu.create(this, itemUnitArray, [this](int cmdID) { return actionFor(cmdID); });
 		_tabPopupMenu.setCommandHandler([this](int cmdID) { command(cmdID); });
-		// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeLangTabContextMenu
 	}
 
 	setupColorSampleBitmapsOnMainMenuItems(); // the tab colour samples of this menu too
@@ -2856,6 +2968,19 @@ bool Notepad_plus::isInTray() const
 	return _pTrayIco && _pTrayIco->isVisible();
 }
 
+void Notepad_plus::updateTrayIconMenu()
+{
+	// upstream reloadLang: changeLangTrayIconContexMenu
+	if (!_pTrayIco || !_pTrayIco->contextMenu())
+		return;
+	for (QAction* action : _pTrayIco->contextMenu()->actions())
+	{
+		const QVariant rcText = action->property(rcTextProperty);
+		if (rcText.isValid())
+			action->setText(QString::fromStdWString(_nativeLangSpeaker.getTrayIconMenuString(action->data().toInt(), rcText.toString().toStdWString())));
+	}
+}
+
 void Notepad_plus::minimizeToTray()
 {
 	// upstream WM_SYSCOMMAND: trayIconControler ADD, showFloatingContainers(false), minimizeDialogs(), SW_HIDE
@@ -2868,7 +2993,9 @@ void Notepad_plus::minimizeToTray()
 		auto* trayMenu = new QMenu(this);
 		auto addItem = [this, trayMenu](int id, const wchar_t* text) {
 			const wstring label = _nativeLangSpeaker.getTrayIconMenuString(id, text);
-			trayMenu->addAction(QString::fromStdWString(label), this, [this, id]() { command(id); });
+			QAction* action = trayMenu->addAction(QString::fromStdWString(label), this, [this, id]() { command(id); });
+			action->setData(id);
+			action->setProperty(rcTextProperty, QString::fromWCharArray(text));
 		};
 		addItem(IDM_SYSTRAYPOPUP_ACTIVATE, L"Activate");
 		trayMenu->addSeparator();

@@ -15,6 +15,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+#include "LocalizationQt.h"
 #include "UserDefineDialog.h"
 
 #include <algorithm>
@@ -816,6 +817,8 @@ void UserDefineDialog::doDialog(bool willBeShown, bool isRTL)
 		if (isRTL)
 			setLayoutDirection(Qt::RightToLeft);
 		create();
+		// upstream IDM_LANG_USER_DLG / the startup UDD_SHOW: changeUserDefineLang after the first doDialog
+		nplx::changeUserDefineLang(*this);
 	}
 	setVisible(willBeShown);
 	if (willBeShown)
@@ -1436,7 +1439,7 @@ void StylerDlg::move2CtrlRight(int ctrlID, QWidget* handle2Move, int handle2Move
 void StylerDlg::initDialog()
 {
 	NppParameters& nppParam = NppParameters::getInstance();
-	// NPLX_TODO(Phase 8): pNativeLangSpeaker->changeUserDefineLangPopupDlg
+	nplx::changeUserDefineLangPopupDlg(*this);
 
 	Style & style = SharedParametersDialog::_pUserLang->_styles.getStyler(_stylerIndex);
 

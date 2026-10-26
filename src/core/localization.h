@@ -19,6 +19,7 @@
 
 #pragma once
 
+#include <initializer_list>
 #include <map>
 #include <string>
 #include <utility>
@@ -62,6 +63,9 @@ public:
 	void getAlternativeNameFromTabContextMenu(std::wstring& output, int cmdID, bool isAlternative, const std::wstring& defaultValue) const;
 	static NppXml::Element searchDlgNode(NppXml::Element node, const char* dlgTagName);
 	std::wstring getSubMenuEntryName(const char* nodeName) const;
+	// NPLX: what upstream changeMenuLang sets by position: the <Entries> (top level menus, _y == -1) and the
+	// <SubEntries> (submenus) of <Menu><Main>, for the UI to apply to its menus
+	std::vector<std::pair<MenuPosition, std::wstring>> getMenuFolderNames() const;
 	std::wstring getNativeLangMenuString(int itemID, const std::wstring& inCaseOfFailureStr = L"", bool removeMarkAnd = false) const;
 	std::wstring getShortcutNameString(int itemID) const;
 	// upstream changeLangTrayIconContexMenu: <Menu><TrayIcon><Item id="43101" name="Activate"/>
@@ -92,6 +96,9 @@ public:
 	// upstream changeDlgLang(hDlg, dlgTagName, ..., titleOutTag) without the window: false when the language has no
 	// such dialog
 	bool getDlgLang(const char* dlgTagName, DlgLang& out, const char* titleTag = nullptr) const;
+	// the same for a node found by its path under <Dialog> (upstream's firstChildElement chains), e.g.
+	// {"UserDefine", "Folder"} or {"StyleConfig", "SubDialog"}
+	bool getDlgLangByPath(std::initializer_list<const char*> path, DlgLang& out, const char* titleTag = nullptr) const;
 	bool getMsgBoxLang(const char* msgBoxTagName, std::wstring& title, std::wstring& message) const;
 	std::wstring getShortcutMapperLangStr(const char *nodeName, const wchar_t* defaultStr) const;
 	std::wstring getProjectPanelLangMenuStr(const char* nodeName, int cmdID, const wchar_t* defaultStr) const;
@@ -110,6 +117,7 @@ public:
 	int messageBox(const char* msgBoxTagName, const wchar_t* defaultMessage, const wchar_t* defaultTitle, int msgBoxType, int intInfo = 0, const wchar_t* strInfo = nullptr) const;
 
 private:
+	void readDlgLang(NppXml::Element dlgNode, DlgLang& out, const char* titleTag) const;
 	NppXml::Element _nativeLang{};
 	static constexpr int _nativeLangEncoding = CP_UTF8; // all Notepad++ xml files should be UTF8
 	bool _isRTL = false; // for Notepad++ GUI

@@ -431,6 +431,7 @@ public:
 
 	// upstream trayIconControler (Preferences > MISC.: "Minimize / Close to the system tray")
 	void minimizeToTray();
+	bool reloadLang(); // upstream: the menus and the dialogs in the language of the new nativeLang.xml
 	void restoreFromTray(); // upstream NPPM_INTERNAL_MINIMIZED_TRAY WM_LBUTTONUP
 	bool isInTray() const;
 	QSystemTrayIcon* getTrayIcon() const { return _pTrayIco; } // NPLX: tests
@@ -449,6 +450,8 @@ private slots:
 private:
 	bool viewVisibleConst(int whichOne) const;
 	void buildMainMenu();
+	void changeMenuLang(); // upstream NativeLangSpeaker::changeMenuLang(_mainMenuHandle)
+	void updateTrayIconMenu();
 	void buildToolBar(); // upstream toolBarIcons[] (Notepad_plus.cpp)
 	// upstream ToolBar::reduce / enlarge / reduceToSet2 / enlargeToSet2 / setToBmpIcons and the Fluent colours:
 	// the icon size and style of nppGUI._tbIconInfo

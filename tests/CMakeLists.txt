@@ -140,3 +140,11 @@ target_compile_definitions(tst_preferences PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${
 target_link_libraries(tst_preferences PRIVATE nplx_ui Qt6::Test)
 add_test(NAME preferences COMMAND tst_preferences)
 set_tests_properties(preferences PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Phase 8: the interface language, switched at runtime
+add_executable(tst_localization tst_localization.cpp)
+set_target_properties(tst_localization PROPERTIES AUTOMOC ON)
+target_compile_definitions(tst_localization PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT_SOURCE_DIR}/data")
+target_link_libraries(tst_localization PRIVATE nplx_ui Qt6::Test)
+add_test(NAME localization COMMAND tst_localization)
+set_tests_properties(localization PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

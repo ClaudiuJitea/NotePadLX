@@ -417,6 +417,7 @@ public :
 	// NPLX: test/automation helpers (upstream drives the dialog through Win32 control messages)
 	QComboBox* comboBox(int id) const;
 	QWidget* dlgItem(int id) const { return ctrl(id); } // upstream ::GetDlgItem(_hSelf, id)
+	void changeTabName(DIALOG_TYPE index, const wchar_t* name2change); // NPLX: also the window title
 	void command(int id); // upstream WM_COMMAND, LOWORD(wParam) == id
 	std::wstring statusbarMessage() const;
 

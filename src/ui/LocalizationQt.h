@@ -23,7 +23,13 @@
 #include <functional>
 #include <string>
 
+class FindReplaceDlg;
 class NativeLangSpeaker;
+class PreferenceDlg;
+class StylerDlg;
+class UserDefineDialog;
+class WordStyleDlg;
+struct DlgLang;
 class QWidget;
 class RcDialog;
 
@@ -38,11 +44,26 @@ namespace nplx
 	// false when the language does not translate this dialog. titleOut: the translated title (empty when none)
 	bool changeDlgLang(QWidget* dlg, const DlgItemLookup& item, const char* dlgTagName, const char* titleTag = nullptr,
 		std::wstring* titleOut = nullptr);
+	// the same with the translation already read (NativeLangSpeaker::getDlgLangByPath); items below minItemId are
+	// left alone (upstream changeUserDefineLang skips the IDs up to 30)
+	bool applyDlgLang(QWidget* dlg, const DlgItemLookup& item, const DlgLang& lang, std::wstring* titleOut = nullptr,
+		int minItemId = 0);
 	bool changeDlgLang(RcDialog& dlg, const char* dlgTagName, const char* titleTag = nullptr, std::wstring* titleOut = nullptr);
 	// a dialog built in code: its controls carry their upstream ID (setCtrlId)
 	bool changeDlgLang(QWidget* dlg, const char* dlgTagName, const char* titleTag = nullptr, std::wstring* titleOut = nullptr);
 	void setCtrlId(QWidget* w, int id);
 	QWidget* ctrlById(const QWidget* dlg, int id);
+
+	// upstream NativeLangSpeaker::changePrefereceDlgLang, changeFindReplaceDlgLang, changeConfigLang,
+	// changeUserDefineLang and changeUserDefineLangPopupDlg
+	void changePreferenceDlgLang(PreferenceDlg& preference);
+	void changeFindReplaceDlgLang(FindReplaceDlg& findReplaceDlg);
+	void changeConfigLang(WordStyleDlg& styleDlg);
+	void changeUserDefineLang(UserDefineDialog& userDefineDlg);
+	void changeUserDefineLangPopupDlg(StylerDlg& stylerDlg);
+
+	// upstream Notepad_plus::reloadLang: every dialog translated so far, again in the language now loaded
+	void retranslateDialogs();
 
 	// the text of a label, button or group box (not of an edit field)
 	void setControlText(QWidget* w, const std::wstring& text);
