@@ -25,7 +25,9 @@
 
 #include "ParentMessenger.h"
 
+class Buffer;
 class QPagedPaintDevice;
+class QPrintDialog;
 class QWidget;
 class ScintillaEditView;
 
@@ -42,6 +44,9 @@ public :
 
 	// the pages: all of them, or fromPage..toPage (1-based, 0 = no limit), or the selection
 	size_t doPrint(QPagedPaintDevice& device, bool justDoIt, bool printSelection = false, int fromPage = 0, int toPage = 0);
+
+	// NPLX: the print dialog opens with its options shown and a PDF file name for print to file
+	static void polishPrintDialog(QPrintDialog& dlg, const Buffer* buffer);
 
 private :
 	QWidget* _parent = nullptr;

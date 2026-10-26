@@ -23,6 +23,7 @@
 
 #include <QLineEdit>
 
+#include "LocalizationQt.h"
 #include "Scintilla.h"
 
 #include "NppConstants.h"
@@ -89,7 +90,7 @@ void FindCharsInRangeDlg::create()
 	enableItem(IDC_RANGEEND_EDIT, false);
 
 	_isUpdatingControls = wasUpdating;
-	// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeDlgLang(_hSelf, "FindCharsInRange")
+	nplx::changeDlgLang(*this, "FindCharsInRange");
 }
 
 void FindCharsInRangeDlg::onCommand(int id, int notification)

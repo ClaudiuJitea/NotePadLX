@@ -38,6 +38,7 @@
 
 #include "ColourPicker.h"
 #include "Common.h"
+#include "DocTabView.h"
 #include "NppConstants.h"
 #include "NppDarkMode.h"
 #include "WordStyleDlgRes.h"
@@ -59,7 +60,7 @@ static constexpr bool C_BACKGROUND = true;
 
 using namespace std;
 
-// NPLX: indexes of upstream TabBarPlus::tabColourIndex / individualTabColourId (the tab bar painting is not ported yet)
+// NPLX: indexes of upstream TabBarPlus::tabColourIndex (= DocTabView::tabColourIndex) / individualTabColourId
 namespace TabBarPlusIndex
 {
 	enum tabColourIndex { activeText, activeFocusedTop, activeUnfocusedTop, inactiveText, inactiveBg };
@@ -617,7 +618,7 @@ void WordStyleDlg::colourPicked(ColourPicker* picker)
 
 		if (tabColourIndex != -1)
 		{
-			// NPLX_TODO(Phase 8): TabBarPlus::setColour (custom tab bar colours)
+			DocTabView::setColour(_pFgColour->getColour(), static_cast<DocTabView::tabColourIndex>(tabColourIndex));
 		}
 		else
 		{
@@ -638,6 +639,12 @@ void WordStyleDlg::colourPicked(ColourPicker* picker)
 	{
 		updateColour(C_BACKGROUND);
 		notifyDataModified();
+
+		if (tabColourIndex != -1)
+		{
+			tabColourIndex = (tabColourIndex == TabBarPlusIndex::inactiveText ? TabBarPlusIndex::inactiveBg : tabColourIndex);
+			DocTabView::setColour(_pBgColour->getColour(), static_cast<DocTabView::tabColourIndex>(tabColourIndex));
+		}
 
 		if (tabColourIndex == -1 && isDocumentMapStyle())
 		{

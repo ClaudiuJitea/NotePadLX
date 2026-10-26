@@ -29,6 +29,7 @@
 #include <QGuiApplication>
 #include <QPlainTextEdit>
 
+#include "LocalizationQt.h"
 #include "calc_sha1.h"
 #include "md5.h"
 #include "sha-256.h"
@@ -155,6 +156,16 @@ void HashFromFilesDlg::setHashType(hashType hashType2set)
 	_ht = hashType2set;
 }
 
+namespace
+{
+	// upstream NppCommands: "MD5FromFilesDlg", "SHA1FromTextDlg", "SHA256FromFilesDlg", "SHA512FromTextDlg"...
+	std::string hashDlgTag(hashType ht, const char* suffix)
+	{
+		const char* prefix = (ht == hash_sha1) ? "SHA1" : (ht == hash_sha256) ? "SHA256" : (ht == hash_sha512) ? "SHA512" : "MD5";
+		return std::string(prefix) + suffix;
+	}
+}
+
 void HashFromFilesDlg::doDialog()
 {
 	if (!isCreated())
@@ -201,7 +212,7 @@ void HashFromFilesDlg::doDialog()
 		}
 		setWindowTitle(QString::fromStdWString(title));
 		setItemText(IDC_HASH_FILEBROWSER_BUTTON, buttonText);
-		// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "MD5FromFilesDlg" / "SHA...FromFilesDlg")
+		nplx::changeDlgLang(*this, hashDlgTag(_ht, "FromFilesDlg").c_str());
 	}
 
 	show();
@@ -375,7 +386,7 @@ void HashFromTextDlg::doDialog()
 		}
 
 		setWindowTitle(QString::fromStdWString(title));
-		// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "MD5FromTextDlg" / "SHA...FromTextDlg")
+		nplx::changeDlgLang(*this, hashDlgTag(_ht, "FromTextDlg").c_str());
 	}
 
 	show();

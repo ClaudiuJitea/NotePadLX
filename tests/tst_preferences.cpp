@@ -26,6 +26,7 @@
 #include <QPlainTextEdit>
 #include <QSlider>
 #include <QStatusBar>
+#include <QStyleHints>
 #include <QTemporaryDir>
 #include <QToolBar>
 
@@ -38,6 +39,7 @@
 #include "ScintillaEditView.h"
 #include "localization.h"
 #include "menuCmdID.h"
+#include "NppDarkModeOptions.h"
 #include "preferenceDlg.h"
 #include "preference_rc.h"
 
@@ -407,6 +409,36 @@ private slots:
 		click(p, IDC_RADIO_DARKMODE_LIGHTMODE);
 		QVERIFY(!nppGUI._darkmode._isEnabled);
 		QVERIFY(!p->dlgItem(IDC_RADIO_DARKMODE_BLUE)->isEnabled());
+	}
+
+	void followSystemColorScheme()
+	{
+		// "Follow the system": a desktop switch to dark turns the dark mode on, with the dark mode's editor theme
+		QStyleHints* hints = QGuiApplication::styleHints();
+		hints->setColorScheme(Qt::ColorScheme::Light);
+		RcDialog* p = page(L"DarkMode");
+		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+		click(p, IDC_RADIO_DARKMODE_FOLLOWWINDOWS);
+		QVERIFY(NppDarkMode::isWindowsModeEnabled());
+		hints->setColorScheme(Qt::ColorScheme::Dark);
+		if (hints->colorScheme() != Qt::ColorScheme::Dark)
+		{
+			click(p, IDC_RADIO_DARKMODE_LIGHTMODE);
+			QSKIP("this Qt platform cannot switch the colour scheme");
+		}
+		QTRY_VERIFY(nppGUI._darkmode._isEnabled);
+		QVERIFY(NppDarkMode::isEnabled());
+		QVERIFY(p->dlgItem(IDC_RADIO_DARKMODE_BLUE)->isEnabled()); // the tone controls follow
+		const std::wstring darkTheme = NppDarkMode::getThemeName();
+		if (!darkTheme.empty())
+			QVERIFY(nppGUI._themeName.ends_with(darkTheme));
+
+		hints->setColorScheme(Qt::ColorScheme::Light);
+		QTRY_VERIFY(!nppGUI._darkmode._isEnabled);
+		QVERIFY(!NppDarkMode::isEnabled());
+		click(p, IDC_RADIO_DARKMODE_LIGHTMODE);
+		QVERIFY(!NppDarkMode::isWindowsModeEnabled());
+		hints->unsetColorScheme();
 	}
 
 	void closeHides()

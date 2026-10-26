@@ -23,6 +23,8 @@
 #include <QTabBar>
 #include <QIcon>
 
+#include <optional>
+
 #include "Buffer.h"
 
 class ScintillaEditView;
@@ -33,6 +35,7 @@ class DocTabView : public QTabBar
 
 public:
 	explicit DocTabView(ScintillaEditView* pView, QWidget* parent = nullptr);
+	~DocTabView() override;
 
 	void addBuffer(BufferID buffer);
 	void closeBuffer(BufferID buffer);
@@ -50,8 +53,12 @@ public:
 	size_t nbItem() const { return static_cast<size_t>(count()); }
 	int getCurrentTabIndex() const { return currentIndex(); }
 	int getItemCount() const { return count(); } // upstream TabBar::getItemCount
-	void tabToStart(); // upstream TabBarPlus::tabToStart
-	void tabToEnd();
+	// upstream TabBarPlus::tabToStart / tabToEnd (the current tab by default): a tab does not pass a tab of the other
+	// pinned state, so the pinned tabs stay first
+	void tabToStart(int index = -1);
+	void tabToEnd(int index = -1);
+	// upstream pin button (Preferences > Tab Bar: "Enable pin tab feature", "Show only pinned tab buttons")
+	void updatePinButtons();
 
 	ScintillaEditView* getScintillaEditView() const { return _pView; }
 
@@ -63,6 +70,16 @@ public:
 	void refreshLabels();
 
 	// upstream individual tab colours (View > Tab > Apply Color 1-5): the colour id of the buffer, -1 for none
+	// upstream TabBarPlus::setColour: the tab bar styles of the theme (Style Configurator > Global Styles > "Active tab
+	// focused indicator", ...). NPLX: a colour left at its stylers.xml default keeps the NotePadLX look
+	enum tabColourIndex {
+		activeText, activeFocusedTop, activeUnfocusedTop, inactiveText, inactiveBg
+	};
+	static void setColour(COLORREF colour2Set, tabColourIndex i);
+	// upstream NPPM_INTERNAL_ISFOCUSEDTAB: the tab bar of the active view draws the focused indicator
+	static void setFocusedTabBar(const DocTabView* tabBar);
+	void applyColours();
+
 	static void setIndividualTabColour(BufferID bufferId, int colorId);
 	int getIndividualTabColourId(int tabIndex) const;
 
@@ -71,9 +88,15 @@ signals:
 	void bufferSelected(BufferID id);
 	// Close button or middle click (upstream: TCN_TABDELETE)
 	void bufferCloseRequested(BufferID id);
+	// a tab dragged out of the tab bar and dropped (upstream TCN_TABDROPPEDOUTSIDE): where, and if Ctrl was down
+	void tabDroppedOutside(const QPoint& globalPos, bool isCtrlDown);
+	// the pin button of a tab (upstream TCN_TABPINNED)
+	void tabPinClicked(int index);
 
 protected:
 	void mouseDoubleClickEvent(QMouseEvent* event) override;
+	void mousePressEvent(QMouseEvent* event) override;
+	void mouseReleaseEvent(QMouseEvent* event) override;
 	void paintEvent(QPaintEvent* event) override;
 	void tabInserted(int index) override;
 
@@ -90,5 +113,12 @@ private:
 	QIcon _readOnlyIcon;
 	QIcon _readOnlySysIcon;
 	QIcon _monitoringIcon;
+	QIcon _pinIcon;
+	QIcon _pinnedIcon;
 	bool _isAlternateIcons = false;
+	QPoint _dragStartPos; // the press of a tab drag (upstream _draggingPoint)
+	bool _isDragging = false;
+
+	bool isPinnedAt(int index) const;
+	void keepPinnedTabsFirst(); // after a drag: upstream refuses to swap a pinned and an unpinned tab
 };

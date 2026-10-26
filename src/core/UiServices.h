@@ -64,6 +64,9 @@ namespace nplx
 			return getSaveFileName(title, filter, dir);
 		}
 
+		// upstream Command::run of a program with its arguments (e.g. a new NotePadLX instance); false when it cannot start
+		virtual bool startDetached(const std::wstring& program, const std::vector<std::wstring>& args) { (void)program; (void)args; return false; }
+
 		// A one-line text input (e.g. upstream FileRelocalizerDlg); false when cancelled
 		virtual bool getText(const std::wstring& title, const std::wstring& label, std::wstring& text) { (void)title; (void)label; (void)text; return false; }
 	};

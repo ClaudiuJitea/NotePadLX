@@ -22,7 +22,11 @@
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QLineEdit>
+#include <QDialog>
+#include <QMenu>
 #include <QMenuBar>
+#include <QSystemTrayIcon>
+#include <QToolButton>
 #include <QTemporaryDir>
 
 #include <cstdlib>
@@ -56,9 +60,18 @@ namespace
 			++_count;
 			return _answerYesNo;
 		}
+		bool startDetached(const std::wstring& program, const std::vector<std::wstring>& args) override
+		{
+			_startedProgram = program;
+			_startedArgs = args;
+			return _canStart;
+		}
 		int _count = 0;
 		int _answerYesNo = IDNO; // "No": never save, so no Save As dialog opens
 		std::wstring _lastMessage;
+		std::wstring _startedProgram; // the last startDetached: no process is started
+		std::vector<std::wstring> _startedArgs;
+		bool _canStart = true;
 	};
 
 	void writeFile(const QString& path, const QByteArray& bytes)
@@ -141,8 +154,8 @@ private slots:
 			QVERIFY2(action(id)->isEnabled(), qPrintable(QString::number(id)));
 		}
 		// still disabled with a tooltip
-		QVERIFY(!action(IDM_VIEW_GOTO_NEW_INSTANCE)->isEnabled());
-		QCOMPARE(action(IDM_VIEW_GOTO_NEW_INSTANCE)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
+		QVERIFY(!action(IDM_SETTING_IMPORTPLUGIN)->isEnabled());
+		QCOMPARE(action(IDM_SETTING_IMPORTPLUGIN)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
 	}
 
 	void sortLines()
@@ -319,6 +332,145 @@ private slots:
 		_npp->command(IDM_FILE_CLOSEALL_BUT_CURRENT); // "No": the other documents are not saved
 		QCOMPARE(tab()->nbItem(), size_t(1));
 		QCOMPARE(QString::fromWCharArray(view()->getCurrentBuffer()->getFullPathName()), paths[3]);
+		view()->execute(SCI_UNDO);
+	}
+
+	void pinTabs()
+	{
+		closeAll();
+		QStringList paths;
+		std::vector<BufferID> ids;
+		for (const char* name : { "pin1.txt", "pin2.txt", "pin3.txt", "pin4.txt" })
+		{
+			paths << _tmp.path() + "/" + name;
+			writeFile(paths.last(), "x\n");
+			ids.push_back(_npp->doOpen(paths.last().toStdWString()));
+			_npp->switchToFile(ids.back());
+		}
+		auto order = [this]() {
+			std::vector<BufferID> v;
+			for (size_t i = 0; i < tab()->nbItem(); ++i)
+				v.push_back(tab()->getBufferByIndex(i));
+			return v;
+		};
+		auto pinButton = [this](int index) -> QToolButton* {
+			for (auto side : { QTabBar::LeftSide, QTabBar::RightSide })
+				if (auto* b = qobject_cast<QToolButton*>(tab()->tabButton(index, side)))
+					return b;
+			return nullptr;
+		};
+
+		// a pinned tab goes after the pinned tabs
+		_npp->switchToFile(ids[2]);
+		_npp->command(IDM_PINTAB);
+		QVERIFY(ids[2]->isPinned());
+		_npp->switchToFile(ids[3]);
+		_npp->command(IDM_PINTAB);
+		QVERIFY(order() == (std::vector<BufferID>{ ids[2], ids[3], ids[0], ids[1] }));
+		QVERIFY(pinButton(0) && pinButton(0)->isVisible());
+		QCOMPARE(pinButton(0)->toolTip(), QStringLiteral("Unpin Tab"));
+
+		// Move to Start / End stay on their side of the pinned tabs
+		_npp->switchToFile(ids[1]);
+		_npp->command(IDM_VIEW_GOTO_START);
+		QVERIFY(order() == (std::vector<BufferID>{ ids[2], ids[3], ids[1], ids[0] }));
+		_npp->switchToFile(ids[2]);
+		_npp->command(IDM_VIEW_GOTO_END);
+		QVERIFY(order() == (std::vector<BufferID>{ ids[3], ids[2], ids[1], ids[0] }));
+
+		// unpinned: before the other unpinned tabs; the pin button toggles too
+		_npp->switchToFile(ids[3]);
+		_npp->command(IDM_PINTAB);
+		QVERIFY(!ids[3]->isPinned());
+		QVERIFY(order() == (std::vector<BufferID>{ ids[2], ids[3], ids[1], ids[0] }));
+		pinButton(0)->click();
+		QVERIFY(!ids[2]->isPinned());
+
+		// Close All BUT Pinned
+		_npp->switchToFile(ids[0]);
+		_npp->command(IDM_PINTAB);
+		_npp->command(IDM_FILE_CLOSEALL_BUT_PINNED);
+		QCOMPARE(tab()->nbItem(), size_t(1));
+		QCOMPARE(tab()->getBufferByIndex(0), ids[0]);
+		_npp->command(IDM_PINTAB);
+		QVERIFY(!ids[0]->isPinned());
+	}
+
+	void systemTray()
+	{
+		// upstream trayIconControler: the window and its dialogs hide, the tray menu brings them back
+		auto* dlg = new QDialog(_npp.get());
+		dlg->show();
+		QVERIFY(QTest::qWaitForWindowExposed(dlg));
+		_npp->minimizeToTray();
+		QVERIFY(_npp->isInTray());
+		QVERIFY(!_npp->isVisible());
+		QVERIFY(!dlg->isVisible());
+
+		QMenu* trayMenu = _npp->getTrayIcon()->contextMenu();
+		QVERIFY(trayMenu);
+		QStringList items;
+		for (QAction* a : trayMenu->actions())
+			if (!a->isSeparator())
+				items << a->text();
+		QCOMPARE(items, QStringList({ "Activate", "New", "New and Paste", "Open...", "Close Tray Icon" }));
+
+		closeAll();
+		QGuiApplication::clipboard()->setText(QStringLiteral("from the tray"));
+		_npp->command(IDM_SYSTRAYPOPUP_NEW_AND_PASTE);
+		QVERIFY(_npp->isVisible());
+		QVERIFY(dlg->isVisible());
+		QCOMPARE(text(), QStringLiteral("from the tray"));
+		QCOMPARE(tab()->nbItem(), size_t(1)); // pasted into the empty "new 1"
+
+		_npp->minimizeToTray();
+		_npp->restoreFromTray(); // a left click on the icon
+		QVERIFY(_npp->isVisible());
+		QVERIFY(!_npp->isInTray());
+		delete dlg;
+		view()->execute(SCI_SETSAVEPOINT);
+	}
+
+	void documentInNewInstance()
+	{
+		closeAll();
+		const QString a = _tmp.path() + "/inst_a.txt";
+		const QString b = _tmp.path() + "/inst_b.txt";
+		writeFile(a, "x\n");
+		writeFile(b, "one\ntwo three\n");
+		_npp->switchToFile(_npp->doOpen(a.toStdWString()));
+		_npp->switchToFile(_npp->doOpen(b.toStdWString()));
+		view()->execute(SCI_GOTOPOS, 6); // line 2, column 3
+		QCOMPARE(tab()->nbItem(), size_t(2));
+		QVERIFY(action(IDM_VIEW_LOAD_IN_NEW_INSTANCE)->isEnabled());
+
+		// upstream: "<npp>" "<file>" -multiInst -nosession -l<lang> -n<line> -c<column>
+		const std::vector<std::wstring> expected = { b.toStdWString(), L"-multiInst", L"-nosession", L"-lnormal", L"-n2", L"-c3" };
+		_ui._startedArgs.clear();
+		_npp->command(IDM_VIEW_LOAD_IN_NEW_INSTANCE);
+		QCOMPARE(_ui._startedProgram, QCoreApplication::applicationFilePath().toStdWString());
+		QVERIFY(_ui._startedArgs == expected);
+		QCOMPARE(tab()->nbItem(), size_t(2)); // cloned: the document stays
+
+		// moved, but the new instance cannot start: the document stays
+		_ui._canStart = false;
+		_npp->command(IDM_VIEW_GOTO_NEW_INSTANCE);
+		QCOMPARE(tab()->nbItem(), size_t(2));
+		_ui._canStart = true;
+
+		_ui._startedArgs.clear();
+		_npp->command(IDM_VIEW_GOTO_NEW_INSTANCE);
+		QVERIFY(_ui._startedArgs == expected);
+		QCOMPARE(tab()->nbItem(), size_t(1)); // moved: closed here
+		QCOMPARE(QString::fromWCharArray(view()->getCurrentBuffer()->getFullPathName()), a);
+		QVERIFY(_npp->isVisible());
+
+		// a modified document has nothing on disk to open: disabled, and no instance starts
+		view()->execute(SCI_APPENDTEXT, 1, reinterpret_cast<LPARAM>("y"));
+		QTRY_VERIFY(!action(IDM_VIEW_GOTO_NEW_INSTANCE)->isEnabled());
+		_ui._startedArgs.clear();
+		_npp->command(IDM_VIEW_LOAD_IN_NEW_INSTANCE);
+		QVERIFY(_ui._startedArgs.empty());
 		view()->execute(SCI_UNDO);
 	}
 

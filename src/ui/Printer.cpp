@@ -21,6 +21,9 @@
 #include <string>
 
 #include <QDateTime>
+#include <QDialogButtonBox>
+#include <QDir>
+#include <QFileInfo>
 #include <QFont>
 #include <QFontMetrics>
 #include <QLocale>
@@ -29,6 +32,8 @@
 #include <QPrintDialog>
 #include <QPrinter>
 #include <QPrinterInfo>
+#include <QPushButton>
+#include <QLineEdit>
 
 #include "Parameters.h"
 #include "RunDlg.h"
@@ -68,6 +73,33 @@ void Printer::init(QWidget* parent, const ParentMessenger& sendToNpp, ScintillaE
 	_isRTL = isRTL;
 }
 
+void Printer::polishPrintDialog(QPrintDialog& dlg, const Buffer* buffer)
+{
+	// NPLX: Qt's own (Unix) print dialog, as a Windows user knows PrintDlg: the page range, selection and copies are
+	// shown, not hidden behind "Options >>", and print to file suggests a file name. Qt gives no API for either, so
+	// both are looked up in the dialog and left alone when they are not there (another Qt version or platform).
+	const QFileInfo file(QString::fromWCharArray(buffer->getFullPathName()));
+	dlg.setWindowTitle(QPrintDialog::tr("Print") + QStringLiteral(" \u2014 ") + file.fileName());
+
+	for (QDialogButtonBox* box : dlg.findChildren<QDialogButtonBox*>())
+		for (QAbstractButton* button : box->buttons())
+		{
+			const QDialogButtonBox::ButtonRole role = box->buttonRole(button);
+			if (role != QDialogButtonBox::AcceptRole && role != QDialogButtonBox::RejectRole)
+				button->click(); // "Options >>"
+		}
+
+	// Qt names the PDF file only on X11; elsewhere it is a folder: suggest <document folder>/<name>.pdf
+	if (QLineEdit* outputFile = dlg.findChild<QLineEdit*>(QStringLiteral("filename")))
+	{
+		if (outputFile->text().isEmpty() || outputFile->text().endsWith(QLatin1Char('/')))
+		{
+			const QString dir = buffer->isUntitled() ? QDir::homePath() : file.absolutePath();
+			outputFile->setText(QDir(dir).filePath(file.completeBaseName() + QStringLiteral(".pdf")));
+		}
+	}
+}
+
 size_t Printer::doPrint()
 {
 	// upstream PRINTDLG: PD_ALLPAGES, PD_SELECTION when a range is selected, and PD_RETURNDEFAULT without the dialog
@@ -89,6 +121,7 @@ size_t Printer::doPrint()
 	dlg.setMinMax(1, 0xffff); // We do not know how many pages in the document until the printer is selected and the paper size is known.
 	if (_startPos != _endPos)
 		printer.setPrintRange(QPrinter::Selection);
+	polishPrintDialog(dlg, _pSEView->getCurrentBuffer());
 	if (dlg.exec() != QDialog::Accepted)
 		return 0;
 

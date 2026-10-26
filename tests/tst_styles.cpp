@@ -32,6 +32,7 @@
 #include <cstdlib>
 
 #include "Buffer.h"
+#include "DocTabView.h"
 #include "SciLexer.h"
 #include "ColourPicker.h"
 #include "Notepad_plus.h"
@@ -145,6 +146,30 @@ private slots:
 				screenshot(dlg(), "style-configurator.png");
 			}
 		}
+	}
+
+	void tabBarColoursFromTheme()
+	{
+		// the theme's tab bar styles colour the tabs; the stylers.xml defaults keep the NotePadLX look
+		DocTabView* mainTab = _npp->getDocTab(MAIN_VIEW);
+		auto selectTheme = [this](const QString& name) {
+			const int index = themeCombo()->findText(name);
+			QVERIFY2(index >= 0, qPrintable(name));
+			themeCombo()->setCurrentIndex(index);
+			dlg()->command(IDC_SWITCH2THEME_COMBO);
+		};
+		selectTheme(QStringLiteral("Bespin")); // the default tab colours
+		QVERIFY(mainTab->styleSheet().isEmpty());
+
+		selectTheme(QStringLiteral("Navajo")); // "Active tab focused indicator" D92B10
+		QVERIFY2(mainTab->styleSheet().contains(QStringLiteral("#d92b10")), qPrintable(mainTab->styleSheet()));
+
+		// a colour picked in the Style Configurator shows at once (upstream TabBarPlus::setColour)
+		DocTabView::setColour(RGB(0x12, 0x34, 0x56), DocTabView::activeFocusedTop);
+		QVERIFY(mainTab->styleSheet().contains(QStringLiteral("#123456")));
+
+		selectTheme(themeCombo()->itemText(0)); // Default (stylers.xml)
+		QVERIFY(mainTab->styleSheet().isEmpty());
 	}
 
 	void editStyleAndCancel()

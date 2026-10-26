@@ -146,10 +146,10 @@ private slots:
 		QVERIFY(action(IDM_LANG_CPP));
 
 		// A command that is not ported is disabled, not silently missing
-		QVERIFY(!Notepad_plus::isCommandPorted(IDM_VIEW_GOTO_NEW_INSTANCE));
-		QVERIFY(action(IDM_VIEW_GOTO_NEW_INSTANCE));
-		QVERIFY(!action(IDM_VIEW_GOTO_NEW_INSTANCE)->isEnabled());
-		QCOMPARE(action(IDM_VIEW_GOTO_NEW_INSTANCE)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
+		QVERIFY(!Notepad_plus::isCommandPorted(IDM_SETTING_IMPORTPLUGIN));
+		QVERIFY(action(IDM_SETTING_IMPORTPLUGIN));
+		QVERIFY(!action(IDM_SETTING_IMPORTPLUGIN)->isEnabled());
+		QCOMPARE(action(IDM_SETTING_IMPORTPLUGIN)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
 	}
 
 	void windowsOnlyItemsAreRemoved()
@@ -525,7 +525,7 @@ private slots:
 		QVERIFY(tabMenu.action(IDM_FILE_CLOSE)->isEnabled());
 		QVERIFY(tabMenu.action(IDM_FILE_RENAME)->isEnabled());
 		QVERIFY(!tabMenu.action(IDM_FILE_DELETE)->isEnabled()); // untitled: no file to trash
-		QVERIFY(!tabMenu.action(IDM_VIEW_GOTO_NEW_INSTANCE)->isEnabled()); // not ported yet: disabled
+		QVERIFY(!tabMenu.action(IDM_VIEW_GOTO_NEW_INSTANCE)->isEnabled()); // untitled: no file for a new instance
 		QCOMPARE(tabMenu.getMenuHandle()->actions().first()->text(), QStringLiteral("Close"));
 
 		// a command chosen in the menu runs through Notepad_plus::command

@@ -26,7 +26,9 @@
 #include <string>
 #include <vector>
 
+#include <QList>
 #include <QMainWindow>
+#include <QPointer>
 #include <QRect>
 #include <QStringList>
 
@@ -47,6 +49,7 @@ class QDropEvent;
 class QLabel;
 class QMenu;
 class QSplitter;
+class QSystemTrayIcon;
 class DocTabView;
 class FindReplaceDlg;
 class FindIncrementDlg;
@@ -220,6 +223,11 @@ public:
 	bool switchToFile(BufferID buffer);
 	void notifyBufferActivated(BufferID bufid, int view);
 	void docGotoAnotherEditView(FileTransferMode mode);	//TransferMode
+	void docOpenInNewInstance(FileTransferMode mode, int x = 0, int y = 0);
+	void tabDroppedOutside(const QPoint& globalPos, bool isInCtrlStat); // upstream TCN_TABDROPPEDOUTSIDE
+	bool noOpenedDoc() const;
+	void tabPinned(DocTabView* docTab, int index); // upstream TCN_TABPINNED: pins or unpins the tab
+	void systemColorSchemeChanged(); // upstream WM_SETTINGCHANGE
 	LangType menuID2LangType(int cmdID);
 	void setLanguage(LangType langType);
 
@@ -280,6 +288,7 @@ public:
 	bool createFilelistForProjects(std::vector<std::wstring>& fileNames);
 	ProjectPanel* getProjectPanel(int i) const { return i == 0 ? _pProjectPanel_1 : (i == 1 ? _pProjectPanel_2 : _pProjectPanel_3); } // NPLX
 	FileBrowser* getFileBrowser() const { return _pFileBrowser; } // NPLX
+	void drawTabbarColoursFromStylerArray();
 	void drawDocumentMapColoursFromStylerArray();
 	DocumentMap* getDocumentMap() const { return _pDocMap; } // NPLX
 	void launchClipboardHistoryPanel();
@@ -420,9 +429,16 @@ public:
 	void showTabContextMenu(int whichOne, const QPoint& globalPos);
 	const ContextMenu& getTabPopupMenu() const { return _tabPopupMenu; } // NPLX: tests
 
+	// upstream trayIconControler (Preferences > MISC.: "Minimize / Close to the system tray")
+	void minimizeToTray();
+	void restoreFromTray(); // upstream NPPM_INTERNAL_MINIMIZED_TRAY WM_LBUTTONUP
+	bool isInTray() const;
+	QSystemTrayIcon* getTrayIcon() const { return _pTrayIco; } // NPLX: tests
+
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 	void closeEvent(QCloseEvent* event) override;
+	void changeEvent(QEvent* event) override; // upstream WM_SYSCOMMAND SC_MINIMIZE
 	void resizeEvent(QResizeEvent* event) override; // NPLX: keeps the restore button in the top-right corner
 	void dragEnterEvent(QDragEnterEvent* event) override;
 	void dropEvent(QDropEvent* event) override;
@@ -547,6 +563,9 @@ private:
 	std::map<Buffer*, class QFileSystemWatcher*> _monitors; // NPLX: "tail -f" watchers (upstream: one thread per buffer)
 	bool _isFolding = false;
 	bool _isAttemptingCloseOnQuit = false;
+	QSystemTrayIcon* _pTrayIco = nullptr;
+	QList<QPointer<QWidget>> _hiddenInTray; // the floating panels and dialogs hidden with the window (upstream minimizeDialogs)
+	void showFromTray(); // upstream: ShowWindow, showFloatingContainers(true), restoreMinimizeDialogs()
 	bool _isNppSessionSavedAtExit = false;
 	class QTimer* _backupTimer = nullptr; // snapshot mode (upstream: backupDocument thread)
 

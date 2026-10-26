@@ -35,6 +35,7 @@
 #include <memory>
 #include <mutex>
 
+#include <QSystemTrayIcon>
 #include <QApplication>
 #include <QClipboard>
 #include <QGuiApplication>
@@ -529,6 +530,14 @@ void Notepad_plus::command(int id)
 			break;
 		}
 
+		case IDM_VIEW_GOTO_NEW_INSTANCE :
+			docOpenInNewInstance(TransferMove);
+			break;
+
+		case IDM_VIEW_LOAD_IN_NEW_INSTANCE:
+			docOpenInNewInstance(TransferClone);
+			break;
+
 		case IDM_FILE_PRINT :
 			filePrint(true);
 			break;
@@ -872,7 +881,6 @@ void Notepad_plus::command(int id)
 				_incrementFindDlg->command(IDM_SEARCH_FINDINCREMENT);
 				break;
 			}
-			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeDlgLang(_incrementFindDlg, "IncrementalFind") on first use
 
 			auto str = _pEditView->getSelectedTextToWChar(false);
 			if (!str.empty())         // the selected text is not empty, then use it
@@ -1583,8 +1591,7 @@ void Notepad_plus::command(int id)
 		{
 			if (!_debugInfoDlg)
 				_debugInfoDlg = new DebugInfoDlg(this);
-			_debugInfoDlg->doDialog();
-			// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_debugInfoDlg, "DebugInfo")
+			_debugInfoDlg->doDialog(); // translated when created
 			break;
 		}
 
@@ -2261,15 +2268,13 @@ void Notepad_plus::command(int id)
 				_findCharsInRangeDlg = new FindCharsInRangeDlg(this);
 				_findCharsInRangeDlg->init(&_pEditView);
 			}
-			_findCharsInRangeDlg->doDialog();
-			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeDlgLang(_findCharsInRangeDlg.getHSelf(), "FindCharsInRange") on first use
+			_findCharsInRangeDlg->doDialog(); // translated when created
 		}
 		break;
 
 		case IDM_SEARCH_GOTOLINE:
 		{
-			_goToLineDlg->doDialog(_nativeLangSpeaker.isRTL());
-			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeDlgLang(_goToLineDlg.getHSelf(), "GoToLine") on first use
+			_goToLineDlg->doDialog(_nativeLangSpeaker.isRTL()); // translated when created
 		}
 		break;
 
@@ -3139,6 +3144,57 @@ void Notepad_plus::command(int id)
 			}
 			break;
 		}
+
+		case IDM_SYSTRAYPOPUP_NEWDOC:
+		{
+			showFromTray();
+			fileNew();
+		}
+		break;
+
+		case IDM_SYSTRAYPOPUP_ACTIVATE :
+		{
+			showFromTray();
+		}
+		break;
+
+		case IDM_SYSTRAYPOPUP_NEW_AND_PASTE:
+		{
+			showFromTray();
+
+			BufferID bufferID = _pEditView->getCurrentBufferID();
+			Buffer * buf = MainFileManager.getBufferByID(bufferID);
+			if (!buf->isUntitled() || buf->docLength() != 0)
+			{
+				fileNew();
+			}
+			// NPLX: upstream IDM_EDIT_PASTE pastes where the focus is, the editor once ShowWindow returns; a window
+			// just out of the tray is not active yet, so the editor gets the text directly
+			_pEditView->setFocus();
+			_pEditView->execute(SCI_PASTE);
+		}
+		break;
+
+		case IDM_SYSTRAYPOPUP_OPENFILE:
+		{
+			showFromTray();
+			fileOpen();
+		}
+		break;
+
+		case IDM_SYSTRAYPOPUP_CLOSE:
+		{
+			if (_pTrayIco)
+				_pTrayIco->hide();
+			if (!isVisible())
+				close(); // upstream WM_CLOSE: not spontaneous, so it quits
+		}
+		break;
+
+		case IDM_PINTAB:
+			// upstream: TCN_TABPINNED on the current tab
+			tabPinned(_pDocTab, _pDocTab->getCurrentTabIndex());
+			break;
 
         case IDM_VIEW_GOTO_START:
 			_pDocTab->tabToStart();

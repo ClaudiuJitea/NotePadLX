@@ -27,6 +27,7 @@
 #include <QRadioButton>
 #include <QRegularExpressionValidator>
 
+#include "LocalizationQt.h"
 #include "Parameters.h"
 #include "ScintillaEditView.h"
 #include "resource.h"
@@ -48,7 +49,8 @@ GoToLineDlg::GoToLineDlg(QWidget* parent)
 	modeRow->addStretch(1);
 	layout->addLayout(modeRow, 0, 0, 1, 3);
 
-	layout->addWidget(new QLabel(QStringLiteral("You are here:"), this), 1, 0);
+	auto* hereLabel = new QLabel(QStringLiteral("You are here:"), this);
+	layout->addWidget(hereLabel, 1, 0);
 	_currLineEdit = new QLineEdit(this);
 	_currLineEdit->setReadOnly(true);
 	layout->addWidget(_currLineEdit, 1, 1);
@@ -60,7 +62,8 @@ GoToLineDlg::GoToLineDlg(QWidget* parent)
 	layout->addWidget(goLabel, 2, 0);
 	layout->addWidget(_goLineEdit, 2, 1);
 
-	layout->addWidget(new QLabel(QStringLiteral("You can't go further than:"), this), 3, 0);
+	auto* furtherLabel = new QLabel(QStringLiteral("You can't go further than:"), this);
+	layout->addWidget(furtherLabel, 3, 0);
 	_lastLine = new QLabel(this);
 	layout->addWidget(_lastLine, 3, 1);
 
@@ -77,6 +80,16 @@ GoToLineDlg::GoToLineDlg(QWidget* parent)
 
 	// upstream WM_INITDIALOG
 	_lineRadio->setChecked(true);
+
+	// the upstream control IDs, for the translations (<Dialog><GoToLine>)
+	nplx::setCtrlId(_lineRadio, IDC_RADIO_GOTOLINE);
+	nplx::setCtrlId(_offsetRadio, IDC_RADIO_GOTOOFFSET);
+	nplx::setCtrlId(hereLabel, ID_URHERE_STATIC);
+	nplx::setCtrlId(goLabel, ID_UGO_STATIC);
+	nplx::setCtrlId(furtherLabel, ID_NOMORETHAN_STATIC);
+	nplx::setCtrlId(go, IDOK);
+	nplx::setCtrlId(cancel, IDCANCEL);
+	nplx::changeDlgLang(this, "GoToLine");
 }
 
 void GoToLineDlg::doDialog(bool isRTL)

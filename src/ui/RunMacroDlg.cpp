@@ -24,6 +24,7 @@
 #include <QComboBox>
 #include <QLineEdit>
 
+#include "LocalizationQt.h"
 #include "Common.h"
 #include "Notepad_plus_msgs.h"
 #include "Parameters.h"
@@ -70,7 +71,7 @@ void RunMacroDlg::create()
 
 	if (auto* times = qobject_cast<QLineEdit*>(dlgItem(IDC_M_RUN_TIMES)))
 		times->setMaxLength(4); // EM_LIMITTEXT
-	// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "MultiMacro")
+	nplx::changeDlgLang(*this, "MultiMacro");
 }
 
 void RunMacroDlg::initMacroList()

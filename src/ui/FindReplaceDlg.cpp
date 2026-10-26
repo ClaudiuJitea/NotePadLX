@@ -48,6 +48,7 @@
 #include <QTabBar>
 #include <QVBoxLayout>
 
+#include "LocalizationQt.h"
 #include "SciLexer.h"
 
 #include "Buffer.h"
@@ -4935,6 +4936,8 @@ void FindIncrementDlg::init(FindReplaceDlg* pFRDlg, bool isRTL)
 	layout->addSpacing(6);
 	layout->addWidget(status, 1);
 	makeButton(IDC_GOUPDOWN_TOGGLE_BUTTON, QString(), QStringLiteral("Move the bar to the top or the bottom"));
+
+	nplx::changeDlgLang(this, [this](int id) { return dlgItem(id); }, "IncrementalFind");
 
 	// upstream WM_INITDIALOG
 	const FindHistory& findHistory = NppParameters::getInstance().getFindHistory();

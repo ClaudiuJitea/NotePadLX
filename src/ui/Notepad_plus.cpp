@@ -37,9 +37,12 @@
 #include <QFileInfo>
 #include <QLabel>
 #include <QKeyEvent>
+#include <QGuiApplication>
+#include <QStyleHints>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSplitter>
+#include <QSystemTrayIcon>
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
@@ -272,7 +275,58 @@ void Notepad_plus::loadLocalizationsAndThemes()
 			}
 		}
 	}
-	// NPLX_TODO(Phase 8): follow the desktop dark mode (NppDarkMode::isWindowsModeEnabled) with its theme
+
+	// NPLX: "Follow the system" follows the desktop colour scheme (upstream: the Windows mode)
+	if (NppDarkMode::isWindowsModeEnabled())
+	{
+		std::wstring themePath;
+		std::wstring xmlFileName = NppDarkMode::getThemeName();
+		if (!xmlFileName.empty())
+		{
+			if (!nppParams.isLocal() || nppParams.isCloud())
+			{
+				themePath = nppParams.getUserPath();
+				pathAppend(themePath, L"themes");
+				pathAppend(themePath, xmlFileName);
+			}
+
+			if (themePath.empty() || !doesFileExist(themePath.c_str()))
+			{
+				themePath = themeSwitcher.getThemeDirPath();
+				pathAppend(themePath, xmlFileName);
+			}
+		}
+		else
+		{
+			const auto& themeInfo = themeSwitcher.getElementFromIndex(0);
+			themePath = themeInfo.second;
+		}
+
+		if (doesFileExist(themePath.c_str()))
+		{
+			nppParams.getNppGUI()._themeName.assign(themePath);
+			nppParams.reloadStylers(themePath.c_str());
+			// NPLX: the views are created after this, with these stylers (upstream WM_UPDATESCINTILLAS)
+		}
+	}
+}
+
+void Notepad_plus::systemColorSchemeChanged()
+{
+	// upstream WM_SETTINGCHANGE: with "Follow the system", the dark mode, its editor theme and icons follow the
+	// desktop. NPLX: nplx::style already switched the window colours (NppDarkMode::isEnabled), so the change is seen
+	// on the saved setting
+	if (!NppDarkMode::isWindowsModeEnabled())
+		return;
+	const bool enableDarkMode = QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+	NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+	if (enableDarkMode == nppGUI._darkmode._isEnabled)
+		return;
+
+	nppGUI._darkmode._isEnabled = enableDarkMode;
+	if (_preference && _preference->darkModeSubDlg())
+		_preference->darkModeSubDlg()->followSystemColorScheme(); // the tone controls
+	refreshDarkMode(true);
 }
 
 std::vector<std::wstring> Notepad_plus::addNppComponents(const wchar_t *destDir, const wchar_t *extFilterName, const wchar_t *extFilter)
@@ -321,6 +375,7 @@ void Notepad_plus::init()
 {
 	NppParameters& nppParam = NppParameters::getInstance();
 	loadLocalizationsAndThemes();
+	connect(QGuiApplication::styleHints(), &QStyleHints::colorSchemeChanged, this, [this]() { systemColorSchemeChanged(); });
 	const ScintillaViewParams& svp = nppParam.getSVP();
 
 	// Upstream order: the file edit view and the FileManager first, then the edit views
@@ -397,6 +452,12 @@ void Notepad_plus::init()
 			switchEditViewTo(view);
 			activateBuffer(tab->getBufferByIndex(static_cast<size_t>(index)), view);
 			showTabContextMenu(view, tab->mapToGlobal(pos));
+		});
+		connect(tab, &DocTabView::tabDroppedOutside, this, [this](const QPoint& globalPos, bool isCtrlDown) {
+			tabDroppedOutside(globalPos, isCtrlDown);
+		});
+		connect(tab, &DocTabView::tabPinClicked, this, [this, tab](int index) {
+			tabPinned(tab, index);
 		});
 		connect(tab, &QTabBar::tabMoved, this, [this]() {
 			// upstream TabBarPlus drag and drop: NPPM_INTERNAL_DOCORDERCHANGED
@@ -1039,6 +1100,9 @@ void Notepad_plus::checkDocState()
 	enableCommand(IDM_FILE_OPEN_FOLDER, isFileExisting);
 	enableCommand(IDM_FILE_OPEN_DEFAULT_VIEWER, isFileExisting);
 
+	enableCommand(IDM_VIEW_GOTO_NEW_INSTANCE, !(isCurrentDirty || isCurrentUntitled));
+	enableCommand(IDM_VIEW_LOAD_IN_NEW_INSTANCE, !(isCurrentDirty || isCurrentUntitled));
+
 	checkMenuItem(IDM_EDIT_TOGGLEREADONLY, curBuf->getUserReadOnly());
 	_pEditView->execute(SCI_SETREADONLY, curBuf->isReadOnly());
 
@@ -1093,6 +1157,7 @@ int Notepad_plus::switchEditViewTo(int gid)
 	_pNonDocTab = (gid == MAIN_VIEW) ? _subDocTab : _mainDocTab;
 	_pEditView = (gid == MAIN_VIEW) ? _mainEditView : _subEditView;
 	_pNonEditView = (gid == MAIN_VIEW) ? _subEditView : _mainEditView;
+	DocTabView::setFocusedTabBar(_pDocTab);
 
 	UserDefineDialog::setScintilla(_pEditView); // upstream _pEditView->beSwitched()
 
@@ -1159,6 +1224,89 @@ void Notepad_plus::syncZoom()
 		_pNonEditView->execute(SCI_SETZOOM, _pEditView->execute(SCI_GETZOOM));
 }
 
+bool Notepad_plus::noOpenedDoc() const
+{
+	if (_mainDocTab->isVisible() && _subDocTab->isVisible())
+		return false;
+	if (_pDocTab->nbItem() == 1)
+	{
+		BufferID buffer = _pDocTab->getBufferByIndex(0);
+		Buffer * buf = MainFileManager.getBufferByID(buffer);
+		if (!buf->isDirty() && buf->isUntitled())
+			return true;
+	}
+	return false;
+}
+
+void Notepad_plus::docOpenInNewInstance(FileTransferMode mode, int x, int y)
+{
+	BufferID bufferID = _pEditView->getCurrentBufferID();
+	Buffer * buf = MainFileManager.getBufferByID(bufferID);
+	if (buf->isUntitled() || buf->isDirty())
+		return;
+
+	// upstream: "<notepad++.exe>" "$(FULL_CURRENT_PATH)" -multiInst -nosession [-x -y] [-l] -n -c, run by Command
+	std::vector<wstring> args = { buf->getFullPathName(), L"-multiInst", L"-nosession" };
+
+	// NPLX: Wayland compositors place a new window themselves, the position is only a hint
+	if (x)
+		args.push_back(L"-x" + std::to_wstring(x));
+	if (y)
+		args.push_back(L"-y" + std::to_wstring(y));
+
+	LangType lt = buf->getLangType();
+
+	// In case of UDL, "-lLANG" argument part is ignored.
+	// We let new instance detect the user lang type via file extension -
+	// it works in the most of case, except if user applies an UDL manually.
+	// For example,  this workaround won't work under the following situation:
+	// user applies Markdown to a file named "myMarkdown.abc".
+	if (lt != L_USER)
+		args.push_back(wstring(L"-l") + ScintillaEditView::_langNameInfoArray[lt]._langName);
+	args.push_back(L"-n" + std::to_wstring(_pEditView->getCurrentLineNumber() + 1));
+	args.push_back(L"-c" + std::to_wstring(_pEditView->getCurrentColumnNumber() + 1));
+
+	const wstring nppName = QCoreApplication::applicationFilePath().toStdWString(); // upstream GetModuleFileName
+	if (!nplx::uiServices() || !nplx::uiServices()->startDetached(nppName, args))
+		return;
+
+	if (mode == TransferMove)
+	{
+		doClose(bufferID, currentView());
+		if (noOpenedDoc())
+			close(); // upstream WM_CLOSE
+	}
+}
+
+void Notepad_plus::tabDroppedOutside(const QPoint& p, bool isInCtrlStat)
+{
+	// upstream TCN_TABDROPPEDOUTSIDE: on the same view, the Move / Clone to Other View menu; on the other view, the
+	// document goes there; outside of the window, a new instance. NPLX: another NotePadLX window cannot be found under
+	// the mouse on Wayland, so a drop outside of this window always opens a new instance
+	QWidget* hWin = QApplication::widgetAt(p);
+	auto isIn = [hWin](QWidget* w) { return hWin && w && (hWin == w || w->isAncestorOf(hWin)); };
+
+	if (isIn(_pEditView)) // In the same view group
+	{
+		QMenu menu(this);
+		menu.addAction(QStringLiteral("Move to Other View"), this, [this]() { command(IDM_VIEW_GOTO_ANOTHER_VIEW); });
+		menu.addAction(QStringLiteral("Clone to Other View"), this, [this]() { command(IDM_VIEW_CLONE_TO_ANOTHER_VIEW); });
+		menu.exec(p);
+	}
+	else if (isIn(_pNonDocTab) || isIn(_pNonEditView)) // In the another view group
+	{
+		docGotoAnotherEditView(isInCtrlStat ? TransferClone : TransferMove);
+	}
+	else // Drop outside of current NotePadLX
+	{
+		const QPoint local = mapFromGlobal(p);
+		if (rect().contains(local))
+			return; // Do nothing
+
+		docOpenInNewInstance(isInCtrlStat ? TransferClone : TransferMove, p.x(), p.y());
+	}
+}
+
 void Notepad_plus::docGotoAnotherEditView(FileTransferMode mode)
 {
 	// Test if it's only doc to transfer on the hidden view
@@ -1205,16 +1353,56 @@ void Notepad_plus::docGotoAnotherEditView(FileTransferMode mode)
 		showView(viewToGo);
 	}
 
+	bool monitoringWasOn = false;
+
 	//Close the document if we transfered the document instead of cloning it
 	if (mode == TransferMove)
 	{
+		monitoringWasOn = buf->isMonitoringOn();
+
 		//just close the activate document, since thats the one we moved (no search)
 		doClose(_pEditView->getCurrentBufferID(), currentView());
 	} // else it was cone, so leave it
 
 	//Activate the other view since thats where the document went
 	switchEditViewTo(viewToGo);
-	// NPLX_TODO(Phase 3): pinned tabs, monitoring state, document list panel
+
+	if (buf->isPinned())
+	{
+		buf->setPinned(false);
+		_pDocTab->tabToStart();
+		buf->setPinned(true);
+		_pDocTab->updatePinButtons();
+	}
+
+	if (monitoringWasOn)
+	{
+		command(IDM_VIEW_MONITORING);
+	}
+
+	if (_pDocumentListPanel != nullptr)
+	{
+		_pDocumentListPanel->setItemColor(buf);
+	}
+}
+
+void Notepad_plus::tabPinned(DocTabView* docTab, int index)
+{
+	// upstream TCN_TABPINNED: a pinned tab goes after the other pinned tabs, an unpinned one before the other
+	// unpinned tabs
+	BufferID bufferToBePinned = docTab->getBufferByIndex(static_cast<size_t>(index));
+	if (bufferToBePinned == BUFFER_INVALID)
+		return;
+	Buffer * buf = MainFileManager.getBufferByID(bufferToBePinned);
+
+	bool isPinned = buf->isPinned();
+	if (!isPinned)
+		docTab->tabToStart(index);
+	else
+		docTab->tabToEnd(index);
+
+	buf->setPinned(!isPinned);
+	docTab->updatePinButtons();
 }
 
 // ============================================================================
@@ -2577,6 +2765,18 @@ void Notepad_plus::showTabContextMenu(int whichOne, const QPoint& globalPos)
 	enableItem(IDM_FILE_SAVEAS, !isInaccessible);
 	enableItem(IDM_FILE_RENAME, !isInaccessible);
 
+	bool isTabPinEnabled = nppParam.getNppGUI()._tabStatus & TAB_PINBUTTON;
+	if (QAction* pinAction = _tabPopupMenu.action(IDM_PINTAB))
+	{
+		wstring newName;
+		if (isTabPinEnabled && buf->isPinned())
+			_nativeLangSpeaker.getAlternativeNameFromTabContextMenu(newName, IDM_PINTAB, true, L"Unpin Tab");
+		else
+			_nativeLangSpeaker.getAlternativeNameFromTabContextMenu(newName, IDM_PINTAB, false, L"Pin Tab");
+		pinAction->setText(QString::fromStdWString(newName));
+	}
+	enableItem(IDM_PINTAB, isTabPinEnabled);
+
 	_tabPopupMenu.display(globalPos);
 }
 
@@ -2651,11 +2851,110 @@ void Notepad_plus::bookmarkClearAll() const
 // Window events
 // ============================================================================
 
+bool Notepad_plus::isInTray() const
+{
+	return _pTrayIco && _pTrayIco->isVisible();
+}
+
+void Notepad_plus::minimizeToTray()
+{
+	// upstream WM_SYSCOMMAND: trayIconControler ADD, showFloatingContainers(false), minimizeDialogs(), SW_HIDE
+	if (!_pTrayIco)
+	{
+		_pTrayIco = new QSystemTrayIcon(QApplication::windowIcon(), this);
+		_pTrayIco->setToolTip(QStringLiteral("NotePadLX"));
+
+		// upstream IDR_SYSTRAYPOPUP_MENU, translated by changeLangTrayIconContexMenu
+		auto* trayMenu = new QMenu(this);
+		auto addItem = [this, trayMenu](int id, const wchar_t* text) {
+			const wstring label = _nativeLangSpeaker.getTrayIconMenuString(id, text);
+			trayMenu->addAction(QString::fromStdWString(label), this, [this, id]() { command(id); });
+		};
+		addItem(IDM_SYSTRAYPOPUP_ACTIVATE, L"Activate");
+		trayMenu->addSeparator();
+		addItem(IDM_SYSTRAYPOPUP_NEWDOC, L"New");
+		addItem(IDM_SYSTRAYPOPUP_NEW_AND_PASTE, L"New and Paste");
+		addItem(IDM_SYSTRAYPOPUP_OPENFILE, L"Open...");
+		trayMenu->addSeparator();
+		addItem(IDM_SYSTRAYPOPUP_CLOSE, L"Close Tray Icon");
+		_pTrayIco->setContextMenu(trayMenu);
+
+		connect(_pTrayIco, &QSystemTrayIcon::activated, this, [this](QSystemTrayIcon::ActivationReason reason) {
+			if (reason == QSystemTrayIcon::Trigger || reason == QSystemTrayIcon::DoubleClick)
+				restoreFromTray();
+			else if (reason == QSystemTrayIcon::MiddleClick)
+				command(IDM_SYSTRAYPOPUP_NEW_AND_PASTE);
+		});
+	}
+	_pTrayIco->show();
+
+	_hiddenInTray.clear();
+	for (QWidget* w : QApplication::topLevelWidgets())
+	{
+		// a top-level window of this one (isAncestorOf stops at window boundaries)
+		QWidget* owner = w->parentWidget();
+		while (owner && owner != this)
+			owner = owner->parentWidget();
+		if (w != this && owner == this && w->isVisible())
+		{
+			_hiddenInTray.push_back(w);
+			w->hide();
+		}
+	}
+	hide();
+}
+
+void Notepad_plus::showFromTray()
+{
+	if (isMinimized())
+		setWindowState(windowState() & ~Qt::WindowMinimized);
+	show();
+	raise();
+	activateWindow();
+	for (const QPointer<QWidget>& w : _hiddenInTray)
+	{
+		if (w)
+			w->show();
+	}
+	_hiddenInTray.clear();
+}
+
+void Notepad_plus::restoreFromTray()
+{
+	showFromTray();
+	_pEditView->setFocus(); // upstream grabFocus
+	if (_pTrayIco)
+		_pTrayIco->hide();
+}
+
+void Notepad_plus::changeEvent(QEvent* event)
+{
+	QMainWindow::changeEvent(event);
+
+	// upstream WM_SYSCOMMAND SC_MINIMIZE with "Minimize to" or "Minimize / Close to" the system tray. NPLX: on
+	// Wayland a window is only told it is minimized when the compositor says so (KDE does, GNOME has no tray)
+	if (event->type() != QEvent::WindowStateChange || !isMinimized())
+		return;
+	const int toTray = NppParameters::getInstance().getNppGUI()._isMinimizedToTray;
+	if ((toTray == sta_minimize || toTray == sta_minimize_close) && QSystemTrayIcon::isSystemTrayAvailable())
+		QTimer::singleShot(0, this, [this]() { minimizeToTray(); });
+}
+
 void Notepad_plus::closeEvent(QCloseEvent* event)
 {
-	// upstream WM_CLOSE (NppBigSwitch.cpp)
+	// upstream WM_SYSCOMMAND SC_CLOSE with "Close to" or "Minimize / Close to" the system tray: the close button of the
+	// window (a spontaneous close event), not File > Exit
 	NppParameters& nppParam = NppParameters::getInstance();
 	const NppGUI& nppgui = nppParam.getNppGUI();
+	if (event->spontaneous() && (nppgui._isMinimizedToTray == sta_close || nppgui._isMinimizedToTray == sta_minimize_close)
+		&& QSystemTrayIcon::isSystemTrayAvailable())
+	{
+		event->ignore();
+		minimizeToTray();
+		return;
+	}
+
+	// upstream WM_CLOSE (NppBigSwitch.cpp)
 	bool isSnapshotMode = nppgui.isSnapshotMode();
 	if (isSnapshotMode)
 	{

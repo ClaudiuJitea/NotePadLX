@@ -68,6 +68,8 @@ add_library(nplx_ui STATIC
     ui/NppSession.cpp
     ui/LastRecentFileList.cpp
     ui/LastRecentFileList.h
+    ui/LocalizationQt.cpp
+    ui/LocalizationQt.h
     ui/DocTabView.cpp
     ui/DocTabView.h
     ui/FindReplaceDlg.cpp

@@ -22,6 +22,7 @@
 #include <QCryptographicHash>
 #include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMimeData>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -33,6 +34,9 @@
 #include <QRegularExpression>
 #include <QProcess>
 #include <QPdfWriter>
+#include <QPrintDialog>
+#include <QPrinter>
+#include <QTabWidget>
 
 #include <cstdlib>
 
@@ -539,6 +543,34 @@ private slots:
 			if ((id >= IDM_VIEW_TAB_COLOUR_1 && id <= IDM_VIEW_TAB_COLOUR_5) || id == IDM_SEARCH_GONEXTMARKER1)
 				QVERIFY2(!a->icon().isNull(), qPrintable(a->text()));
 		}
+		_npp->command(IDM_FILE_CLOSE);
+	}
+
+	void printDialogIsPolished()
+	{
+		// the options (page range, selection, copies) are shown, and print to file suggests <folder>/<name>.pdf
+		const QString fn = _tmp.filePath(QStringLiteral("polished.txt"));
+		{
+			QFile f(fn);
+			QVERIFY(f.open(QIODevice::WriteOnly));
+			f.write("text\n");
+		}
+		const BufferID id = _npp->doOpen(fn.toStdWString());
+		QVERIFY(id != BUFFER_INVALID);
+		_npp->switchToFile(id);
+
+		QPrinter printer(QPrinter::HighResolution);
+		QPrintDialog dlg(&printer, _npp.get());
+		Printer::polishPrintDialog(dlg, _npp->getActiveEditView()->getCurrentBuffer());
+		dlg.show();
+		QVERIFY(dlg.windowTitle().endsWith(QStringLiteral("polished.txt")));
+		QTabWidget* options = dlg.findChild<QTabWidget*>();
+		QVERIFY(options);
+		QTRY_VERIFY(options->isVisible());
+		QLineEdit* outputFile = dlg.findChild<QLineEdit*>(QStringLiteral("filename"));
+		QVERIFY(outputFile);
+		QCOMPARE(outputFile->text(), _tmp.filePath(QStringLiteral("polished.pdf")));
+		dlg.reject();
 		_npp->command(IDM_FILE_CLOSE);
 	}
 

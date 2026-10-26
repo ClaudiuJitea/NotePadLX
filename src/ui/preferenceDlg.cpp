@@ -25,6 +25,7 @@
 #include <utility>
 #include <vector>
 
+#include <QSystemTrayIcon>
 #include <QAbstractButton>
 #include <QApplication>
 #include <QClipboard>
@@ -1487,6 +1488,11 @@ void DarkModeSubDlg::applyChange(bool forceRefresh, bool doEnableCustomizedColor
 	const bool isEnabled = NppParameters::getInstance().getNppGUI()._darkmode._isEnabled;
 	if (wasEnabled != isEnabled || forceRefresh)
 		sendToNpp(NPPM_INTERNAL_REFRESHDARKMODE, static_cast<uptr_t>(wasEnabled != isEnabled), 0);
+}
+
+void DarkModeSubDlg::followSystemColorScheme()
+{
+	onCommand(IDC_RADIO_DARKMODE_DARKMODE, 0);
 }
 
 void DarkModeSubDlg::onCommand(int id, int /*notification*/)
@@ -4187,11 +4193,14 @@ void MiscSubDlg::initDialog()
 	if (nppGUI._isMinimizedToTray < 0 || nppGUI._isMinimizedToTray > sta_minimize_close)
 		nppGUI._isMinimizedToTray = sta_none;
 	trayCombo->setCurrentIndex(nppGUI._isMinimizedToTray);
-	// NPLX: the system tray icon is not ported yet (Phase 8)
-	for (int ctrl : { IDC_COMBO_SYSTRAY_ACTION_CHOICE, IDC_SYSTRAY_STATIC })
+	// NPLX: some desktops (GNOME without an extension) have no system tray
+	if (!QSystemTrayIcon::isSystemTrayAvailable())
 	{
-		enableItem(ctrl, false);
-		dlgItem(ctrl)->setToolTip(QStringLiteral("The system tray icon is not ported to NotePadLX yet."));
+		for (int ctrl : { IDC_COMBO_SYSTRAY_ACTION_CHOICE, IDC_SYSTRAY_STATIC })
+		{
+			enableItem(ctrl, false);
+			dlgItem(ctrl)->setToolTip(QStringLiteral("This desktop has no system tray."));
+		}
 	}
 
 	// NPLX: GDI / DirectWrite are Windows-only (Scintilla's Qt backend draws with QPainter)

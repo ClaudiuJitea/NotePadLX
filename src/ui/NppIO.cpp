@@ -126,6 +126,8 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 	// If we found the document, then we don't open the existing doc. We return the found buffer ID instead.
 	if (foundBufID != BUFFER_INVALID && !isSnapshotMode)
 	{
+		if (isInTray())
+			restoreFromTray();
 		return foundBufID;
 	}
 

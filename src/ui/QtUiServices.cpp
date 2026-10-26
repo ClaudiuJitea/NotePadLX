@@ -19,6 +19,7 @@
 #include <QGuiApplication>
 #include <QCheckBox>
 #include <QFileDialog>
+#include <QProcess>
 #include <QGridLayout>
 #include <QInputDialog>
 #include <QLineEdit>
@@ -186,4 +187,12 @@ int QtUiServices::saveOrNotMultiBox(const std::wstring& message, const std::wstr
 	if (clicked == yesAll) return IDRETRY;  // upstream: IDRETRY = "Yes to all"
 	if (clicked == noAll) return IDIGNORE;  // upstream: IDIGNORE = "No to all"
 	return IDCANCEL;
+}
+
+bool QtUiServices::startDetached(const std::wstring& program, const std::vector<std::wstring>& args)
+{
+	QStringList arguments;
+	for (const std::wstring& arg : args)
+		arguments << QString::fromStdWString(arg);
+	return QProcess::startDetached(QString::fromStdWString(program), arguments);
 }

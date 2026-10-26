@@ -44,7 +44,9 @@
 #include "json.hpp"
 #include "pugixml.hpp"
 
+#include "LocalizationQt.h"
 #include "Parameters.h"
+#include "resource.h"
 
 namespace
 {
@@ -211,6 +213,10 @@ DebugInfoDlg::DebugInfoDlg(QWidget* parent)
 	auto* layout = new QVBoxLayout(this);
 	layout->addWidget(_edit, 1);
 	layout->addWidget(buttons);
+
+	nplx::setCtrlId(copy, IDC_DEBUGINFO_COPYLINK);
+	nplx::setCtrlId(ok, IDOK);
+	nplx::changeDlgLang(this, "DebugInfo");
 }
 
 void DebugInfoDlg::refreshDebugInfo()

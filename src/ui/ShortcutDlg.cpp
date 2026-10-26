@@ -23,6 +23,7 @@
 #include <QLineEdit>
 #include <QListWidget>
 
+#include "LocalizationQt.h"
 #include "Common.h"
 #include "RunDlg_rc.h"
 #include "RunMacroDlg_rc.h"
@@ -109,7 +110,7 @@ int ShortcutDlg::doDialog()
 
 	updateOkState();
 	updateConflictState();
-	// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "ShortcutMapperSubDialg")
+	nplx::changeDlgLang(*this, "ShortcutMapperSubDialg");
 
 	return exec() == QDialog::Accepted ? 0 : -1;
 }
@@ -295,7 +296,7 @@ int ScintillaKeyMapDlg::doDialog()
 	validateDialog();
 	// Hide this warning on startup
 	showItem(IDC_WARNING_STATIC, false);
-	// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "ShortcutMapperSubDialg")
+	nplx::changeDlgLang(*this, "ShortcutMapperSubDialg");
 
 	return exec() == QDialog::Accepted ? 0 : -1;
 }

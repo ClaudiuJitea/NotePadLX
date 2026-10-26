@@ -27,6 +27,7 @@
 #include <QPlainTextEdit>
 #include <QTabBar>
 
+#include "LocalizationQt.h"
 #include "BabyGridWrapper.h"
 #include "Common.h"
 #include "NppMenu.h"
@@ -127,7 +128,7 @@ void ShortcutMapper::initBabyGrid()
 	};
 	_babygrid->_onRowChanged = [this](int row) { onRowChanged(row); };
 
-	// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "ShortcutMapper")
+	nplx::changeDlgLang(*this, "ShortcutMapper");
 	_conflictInfoOk = mapperLangStr("ConflictInfoOk", L"No shortcut conflicts for this item.");
 	_conflictInfoEditing = mapperLangStr("ConflictInfoEditing", L"No conflicts . . .");
 }

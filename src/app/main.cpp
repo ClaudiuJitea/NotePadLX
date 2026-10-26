@@ -176,7 +176,10 @@ int main(int argc, char* argv[])
 	{
 		singleInstance.listen([&notepad_plus](const std::vector<std::wstring>& files, const CmdLineParamsDTO& params) {
 			notepad_plus.loadCommandlineParams(files, &params);
-			if (notepad_plus.isMinimized())
+			// upstream NPPM_INTERNAL_RESTOREFROMMINIMIZED: out of the tray, or restored
+			if (notepad_plus.isInTray())
+				notepad_plus.restoreFromTray();
+			else if (notepad_plus.isMinimized())
 				notepad_plus.showNormal();
 			notepad_plus.raise();
 			notepad_plus.activateWindow();

@@ -131,6 +131,8 @@ class DarkModeSubDlg : public PreferenceSubDlg
 	friend class PreferenceDlg;
 public:
 	using PreferenceSubDlg::PreferenceSubDlg;
+	// upstream WM_SETTINGCHANGE sends IDC_RADIO_DARKMODE_DARKMODE: the controls follow the new desktop mode
+	void followSystemColorScheme();
 protected:
 	void initDialog() override;
 	void onCommand(int id, int notification) override;

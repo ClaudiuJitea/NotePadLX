@@ -21,6 +21,7 @@
 
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "NppXml.h"
@@ -45,6 +46,15 @@ private:
 	const char* _id = nullptr; // a unique string defined in localization XML file
 };
 
+// NPLX: what upstream changeDlgLang sets on a dialog (<Dialog><tag title="..."><Item id="" name=""/><ComboBox id="">
+// <Element name=""/></ComboBox>), for the UI to apply to its widgets (ui/LocalizationQt.h)
+struct DlgLang
+{
+	std::wstring _title; // empty: not translated
+	std::vector<std::pair<int, std::wstring>> _items;
+	std::vector<std::pair<int, std::vector<std::wstring>>> _comboBoxes;
+};
+
 class NativeLangSpeaker
 {
 public:
@@ -54,6 +64,8 @@ public:
 	std::wstring getSubMenuEntryName(const char* nodeName) const;
 	std::wstring getNativeLangMenuString(int itemID, const std::wstring& inCaseOfFailureStr = L"", bool removeMarkAnd = false) const;
 	std::wstring getShortcutNameString(int itemID) const;
+	// upstream changeLangTrayIconContexMenu: <Menu><TrayIcon><Item id="43101" name="Activate"/>
+	std::wstring getTrayIconMenuString(int itemID, const std::wstring& inCaseOfFailureStr) const;
 
 	bool getDoSaveOrNotStrings(std::wstring& title, std::wstring& msg) const;
 
@@ -77,6 +89,9 @@ public:
 		return _nativeLangEncoding;
 	}
 
+	// upstream changeDlgLang(hDlg, dlgTagName, ..., titleOutTag) without the window: false when the language has no
+	// such dialog
+	bool getDlgLang(const char* dlgTagName, DlgLang& out, const char* titleTag = nullptr) const;
 	bool getMsgBoxLang(const char* msgBoxTagName, std::wstring& title, std::wstring& message) const;
 	std::wstring getShortcutMapperLangStr(const char *nodeName, const wchar_t* defaultStr) const;
 	std::wstring getProjectPanelLangMenuStr(const char* nodeName, int cmdID, const wchar_t* defaultStr) const;

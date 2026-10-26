@@ -598,6 +598,8 @@ QTabBar[nplxTopBar="false"]::tab:left:selected { border-right-color: transparent
 QTabBar::tab:disabled { color: {disabled}; }
 QTabBar::close-button { image: url({tab_close}); subcontrol-position: right; border-radius: 4px; margin: 2px; }
 QTabBar::close-button:hover { image: url({tab_close_hover}); background: {dangerSoft}; }
+QTabBar QToolButton#nplxPinButton { border: none; border-radius: 4px; margin: 2px; padding: 0px; background: transparent; }
+QTabBar QToolButton#nplxPinButton:hover { background: {hover}; }
 QTabBar QToolButton { background: {window}; border: 1px solid {border}; border-radius: 4px; }
 QTabWidget::pane { border: 1px solid {border}; border-radius: 6px; top: -1px; background: {window}; }
 

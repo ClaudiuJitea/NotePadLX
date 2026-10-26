@@ -32,6 +32,7 @@
 #include <QStandardPaths>
 #include <QUrl>
 
+#include "LocalizationQt.h"
 #include "Common.h"
 #include "Notepad_plus_msgs.h"
 #include "Parameters.h"
@@ -512,7 +513,7 @@ void RunDlg::doDialog()
 	if (!isCreated())
 	{
 		buildFrom(IDD_RUN_DLG_def);
-		// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "Run")
+		nplx::changeDlgLang(*this, "Run");
 	}
 
 	show();

@@ -1388,7 +1388,7 @@ void Notepad_plus::updateScintillas(bool doChangePanel)
 
 	_findReplaceDlg->updateFinderScintilla();
 
-	// NPLX_TODO(Phase 8): drawTabbarColoursFromStylerArray (custom tab bar colours)
+	drawTabbarColoursFromStylerArray();
 	drawDocumentMapColoursFromStylerArray();
 
 	// Update default fg/bg colors in Parameters for both internal/plugins docking dialog

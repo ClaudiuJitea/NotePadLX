@@ -32,6 +32,7 @@
 #include <QTreeWidget>
 #include <QVBoxLayout>
 
+#include "LocalizationQt.h"
 #include "Buffer.h"
 #include "Common.h"
 #include "DocTabView.h"
@@ -227,6 +228,13 @@ WindowsDlg::WindowsDlg(QWidget* parent)
 	_sortButton = new QPushButton(tr("Sort &tabs"), this);
 	auto* okButton = new QPushButton(tr("&OK"), this);
 
+	// the upstream control IDs, for the translations (<Dialog><Window>; WindowsDlgRc.h: IDD_WINDOWS 7000)
+	nplx::setCtrlId(_activateButton, IDOK);
+	nplx::setCtrlId(okButton, IDCANCEL);
+	nplx::setCtrlId(_saveButton, 7000 + 2);  // IDC_WINDOWS_SAVE
+	nplx::setCtrlId(_closeButton, 7000 + 3); // IDC_WINDOWS_CLOSE
+	nplx::setCtrlId(_sortButton, 7000 + 4);  // IDC_WINDOWS_SORT
+
 	auto* buttons = new QVBoxLayout();
 	buttons->addWidget(_activateButton);
 	buttons->addWidget(_saveButton);
@@ -300,7 +308,7 @@ int WindowsDlg::doDialog()
 		setGeometry(_lastKnownLocation);
 
 	doRefresh(true);
-	// NPLX_TODO(Phase 8): pNativeSpeaker->changeDlgLang(_hSelf, "Window")
+	nplx::changeDlgLang(this, "Window");
 	return exec();
 }
 

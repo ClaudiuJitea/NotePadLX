@@ -476,6 +476,29 @@ void Notepad_plus::applyUserDefineDlgStatus()
 	checkMenuItem(IDM_LANG_USER_DLG, uddShow);
 }
 
+void Notepad_plus::drawTabbarColoursFromStylerArray()
+{
+	// NPLX: upstream compares static_cast<long>(colour) != -1, never false where long is 64-bit
+	StyleArray& globalStyles = NppParameters::getInstance().getGlobalStylers();
+	const Style *stActText = globalStyles.findByName(TABBAR_ACTIVETEXT);
+	if (stActText && stActText->_fgColor != static_cast<COLORREF>(-1))
+		DocTabView::setColour(stActText->_fgColor, DocTabView::activeText);
+
+	const Style *stActfocusTop = globalStyles.findByName(TABBAR_ACTIVEFOCUSEDINDCATOR);
+	if (stActfocusTop && stActfocusTop->_fgColor != static_cast<COLORREF>(-1))
+		DocTabView::setColour(stActfocusTop->_fgColor, DocTabView::activeFocusedTop);
+
+	const Style *stActunfocusTop = globalStyles.findByName(TABBAR_ACTIVEUNFOCUSEDINDCATOR);
+	if (stActunfocusTop && stActunfocusTop->_fgColor != static_cast<COLORREF>(-1))
+		DocTabView::setColour(stActunfocusTop->_fgColor, DocTabView::activeUnfocusedTop);
+
+	const Style *stInact = globalStyles.findByName(TABBAR_INACTIVETEXT);
+	if (stInact && stInact->_fgColor != static_cast<COLORREF>(-1))
+		DocTabView::setColour(stInact->_fgColor, DocTabView::inactiveText);
+	if (stInact && stInact->_bgColor != static_cast<COLORREF>(-1))
+		DocTabView::setColour(stInact->_bgColor, DocTabView::inactiveBg);
+}
+
 void Notepad_plus::drawDocumentMapColoursFromStylerArray()
 {
 	Style* docMap = NppParameters::getInstance().getMiscStylerArray().findByName(VIEWZONE_DOCUMENTMAP);

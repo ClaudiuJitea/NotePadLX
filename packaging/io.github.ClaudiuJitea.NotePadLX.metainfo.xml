@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.8" date="2026-10-26">
+      <description>
+        <p>Move / Open in New Instance (also by dragging a tab out of the window), Pin Tab, the tray icon, following the desktop's light / dark switch, theme tab colours, translated dialogs and a polished print dialog.</p>
+      </description>
+    </release>
     <release version="0.7" date="2026-10-26">
       <description>
         <p>Printing (File &gt; Print with the headers, footers and margins of Preferences &gt; Print, and Print Now), Incremental Search, tab colours, Load / Save Session, Find characters in range, theme import and Edit Popup ContextMenu.</p>

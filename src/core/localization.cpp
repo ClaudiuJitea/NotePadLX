@@ -244,6 +244,30 @@ void NativeLangSpeaker::getAlternativeNameFromTabContextMenu(std::wstring& outpu
 	output = defaultValue;
 }
 
+std::wstring NativeLangSpeaker::getTrayIconMenuString(int itemID, const std::wstring& inCaseOfFailureStr) const
+{
+	if (!_nativeLang) return inCaseOfFailureStr;
+
+	NppXml::Element tryIconMenu = NppXml::firstChildElement(_nativeLang, "Menu");
+	if (!tryIconMenu) return inCaseOfFailureStr;
+
+	tryIconMenu = NppXml::firstChildElement(tryIconMenu, "TrayIcon");
+	if (!tryIconMenu) return inCaseOfFailureStr;
+
+	WcharMbcsConvertor& wmc = WcharMbcsConvertor::getInstance();
+
+	for (NppXml::Element childNode = NppXml::firstChildElement(tryIconMenu, "Item");
+		childNode;
+		childNode = NppXml::nextSiblingElement(childNode, "Item"))
+	{
+		const int id = NppXml::intAttribute(childNode, "id", -1); // id starts with <Item id="43101" name="Activate"/>
+		const char* name = NppXml::attribute(childNode, "name");
+		if (id == itemID && (name && name[0]))
+			return wmc.char2wchar(name, _nativeLangEncoding);
+	}
+	return inCaseOfFailureStr;
+}
+
 NppXml::Element NativeLangSpeaker::searchDlgNode(NppXml::Element node, const char* dlgTagName)
 {
 	NppXml::Element dlgNode = NppXml::firstChildElement(node, dlgTagName);
@@ -411,6 +435,55 @@ bool NativeLangSpeaker::getDoSaveOrNotStrings(std::wstring& title, std::wstring&
 		}
 	}
 	return false;
+}
+
+bool NativeLangSpeaker::getDlgLang(const char* dlgTagName, DlgLang& out, const char* titleTag) const
+{
+	out = DlgLang{};
+
+	if (!_nativeLang) return false;
+
+	NppXml::Element dlgNode = NppXml::firstChildElement(_nativeLang, "Dialog");
+	if (!dlgNode) return false;
+
+	dlgNode = searchDlgNode(dlgNode, dlgTagName);
+	if (!dlgNode) return false;
+
+	WcharMbcsConvertor& wmc = WcharMbcsConvertor::getInstance();
+
+	// Set Title
+	const char* titleToset = NppXml::attribute(dlgNode, titleTag && titleTag[0] ? titleTag : "title");
+	if (titleToset && titleToset[0])
+		out._title = wmc.char2wchar(titleToset, _nativeLangEncoding);
+
+	// Set the text of child control
+	for (NppXml::Element childNode = NppXml::firstChildElement(dlgNode, "Item");
+		childNode;
+		childNode = NppXml::nextSiblingElement(childNode, "Item"))
+	{
+		const int id = NppXml::intAttribute(childNode, "id", -1); // id starts with <Item id="1" name="depends on dialog"/>
+		const char* name = NppXml::attribute(childNode, "name");
+		if (id >= 0 && (name && name[0]))
+			out._items.emplace_back(id, wmc.char2wchar(name, _nativeLangEncoding));
+	}
+
+	for (NppXml::Element childNode = NppXml::firstChildElement(dlgNode, "ComboBox");
+		childNode;
+		childNode = NppXml::nextSiblingElement(childNode, "ComboBox"))
+	{
+		std::vector<std::wstring> comboElms;
+		const int id = NppXml::intAttribute(childNode, "id", -1);
+
+		for (NppXml::Element gChildNode = NppXml::firstChildElement(childNode, "Element");
+			gChildNode;
+			gChildNode = NppXml::nextSiblingElement(gChildNode, "Element"))
+		{
+			const char* name = NppXml::attribute(gChildNode, "name");
+			comboElms.push_back(string2wstring(name ? name : "", _nativeLangEncoding));
+		}
+		out._comboBoxes.emplace_back(id, std::move(comboElms));
+	}
+	return true;
 }
 
 bool NativeLangSpeaker::getMsgBoxLang(const char* msgBoxTagName, std::wstring& title, std::wstring& message) const

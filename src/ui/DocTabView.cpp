@@ -19,9 +19,11 @@
 
 #include "NplxStyle.h"
 
+#include <QApplication>
 #include <QBoxLayout>
 #include <QMouseEvent>
 #include <QPainter>
+#include <QToolButton>
 #include <QPaintEvent>
 #include <QStyle>
 #include <QVariant>
@@ -40,6 +42,14 @@ namespace
 	{
 		return QVariant::fromValue(reinterpret_cast<quintptr>(id));
 	}
+
+	// the theme's tab bar colours, unset while they are the stylers.xml defaults
+	std::optional<QColor> g_tabColours[DocTabView::inactiveBg + 1];
+	const COLORREF g_defaultTabColours[DocTabView::inactiveBg + 1] = {
+		RGB(0x00, 0x00, 0x00), RGB(0xFA, 0xAA, 0x3C), RGB(0xFF, 0xCA, 0xB0), RGB(0x80, 0x80, 0x80), RGB(0xC0, 0xC0, 0xC0)
+	};
+	const DocTabView* g_focusedTabBar = nullptr;
+	QList<DocTabView*> g_tabBars;
 }
 
 DocTabView::DocTabView(ScintillaEditView* pView, QWidget* parent)
@@ -54,9 +64,11 @@ DocTabView::DocTabView(ScintillaEditView* pView, QWidget* parent)
 	setSelectionBehaviorOnRemove(QTabBar::SelectRightTab);
 
 	loadIcons(false);
+	g_tabBars.push_back(this);
 
 	connect(this, &QTabBar::currentChanged, this, [this](int index) {
 		updateCloseButtons();
+		updatePinButtons();
 		if (_isSettingBuffer || index < 0)
 			return;
 		emit bufferSelected(getBufferByIndex(static_cast<size_t>(index)));
@@ -64,6 +76,68 @@ DocTabView::DocTabView(ScintillaEditView* pView, QWidget* parent)
 	connect(this, &QTabBar::tabCloseRequested, this, [this](int index) {
 		emit bufferCloseRequested(getBufferByIndex(static_cast<size_t>(index)));
 	});
+}
+
+DocTabView::~DocTabView()
+{
+	g_tabBars.removeAll(this);
+	if (g_focusedTabBar == this)
+		g_focusedTabBar = nullptr;
+}
+
+void DocTabView::setColour(COLORREF colour2Set, tabColourIndex i)
+{
+	if (i < activeText || i > inactiveBg)
+		return;
+	if (colour2Set == g_defaultTabColours[i])
+		g_tabColours[i].reset();
+	else
+		g_tabColours[i] = QColor(GetRValue(colour2Set), GetGValue(colour2Set), GetBValue(colour2Set));
+	for (DocTabView* tabBar : g_tabBars)
+		tabBar->applyColours();
+}
+
+void DocTabView::setFocusedTabBar(const DocTabView* tabBar)
+{
+	if (g_focusedTabBar == tabBar)
+		return;
+	g_focusedTabBar = tabBar;
+	if (g_tabColours[activeUnfocusedTop] || g_tabColours[activeFocusedTop])
+	{
+		for (DocTabView* t : g_tabBars)
+			t->applyColours();
+	}
+}
+
+void DocTabView::applyColours()
+{
+	// upstream TabBarPlus::drawItem: the top bar colours in both modes; the text and inactive background colours only
+	// in light mode (dark mode uses its own). NPLX: a style sheet on the tab bar, over the application's tab rules
+	const int tabStatus = NppParameters::getInstance().getNppGUI()._tabStatus;
+	const bool isDarkMode = NppDarkMode::isEnabled();
+	const bool isFocused = (g_focusedTabBar == nullptr || g_focusedTabBar == this);
+	QString qss;
+
+	const std::optional<QColor>& top = g_tabColours[isFocused ? activeFocusedTop : activeUnfocusedTop];
+	if (top && (tabStatus & TAB_DRAWTOPBAR))
+	{
+		qss += QStringLiteral("QTabBar::tab:selected { border-bottom: 2px solid %1; }"
+			"QTabBar::tab:left:selected { border-bottom: none; border-right: 2px solid %1; }").arg(top->name());
+	}
+	if (!isDarkMode)
+	{
+		if (const auto& c = g_tabColours[activeText])
+			qss += QStringLiteral("QTabBar::tab:selected { color: %1; }").arg(c->name());
+		if (const auto& c = g_tabColours[inactiveText])
+			qss += QStringLiteral("QTabBar::tab:!selected { color: %1; }").arg(c->name());
+		if (const auto& c = g_tabColours[inactiveBg]; c && (tabStatus & TAB_DRAWINACTIVETAB))
+		{
+			qss += QStringLiteral("QTabBar::tab:!selected { background: %1; }"
+				"QTabBar::tab:!selected:hover { background: %2; }").arg(c->name(), c->darker(110).name());
+		}
+	}
+	if (qss != styleSheet())
+		setStyleSheet(qss);
 }
 
 void DocTabView::loadIcons(bool alternate)
@@ -75,6 +149,8 @@ void DocTabView::loadIcons(bool alternate)
 	_readOnlyIcon = nplx::style::tabIcon(QStringLiteral("tab_readonly"), alternate);
 	_readOnlySysIcon = nplx::style::tabIcon(QStringLiteral("tab_readonly_sys"), alternate);
 	_monitoringIcon = nplx::style::tabIcon(QStringLiteral("tab_monitoring"), alternate);
+	_pinIcon = nplx::style::icon(QStringLiteral("tab_pin"));
+	_pinnedIcon = nplx::style::icon(QStringLiteral("tab_pinned"));
 }
 
 void DocTabView::applyTabStatus()
@@ -101,6 +177,8 @@ void DocTabView::applyTabStatus()
 	if (closeButtons != tabsClosable())
 		setTabsClosable(closeButtons);
 	updateCloseButtons();
+	updatePinButtons();
+	applyColours();
 
 	const bool alternate = tabStatus & TAB_ALTICONS;
 	if (alternate != _isAlternateIcons)
@@ -136,6 +214,75 @@ void DocTabView::updateCloseButtons()
 	{
 		if (QWidget* button = tabButton(i, side))
 			button->setVisible(onInactiveTabs || i == currentIndex());
+	}
+}
+
+void DocTabView::updatePinButtons()
+{
+	// upstream TabBarPlus: the pin button shows on the tabs that show a close button, and always on a pinned tab;
+	// with "Show only pinned tab buttons", only on the pinned tabs. NPLX: on the other side of the tab from the
+	// close button
+	const int tabStatus = NppParameters::getInstance().getNppGUI()._tabStatus;
+	const bool isPinEnabled = tabStatus & TAB_PINBUTTON;
+	const bool isPinSimplest = tabStatus & TAB_SHOWONLYPINNEDBUTTON;
+	const bool onInactiveTabs = tabStatus & TAB_INACTIVETABSHOWBUTTON;
+	const auto closeSide = static_cast<QTabBar::ButtonPosition>(style()->styleHint(QStyle::SH_TabBar_CloseButtonPosition, nullptr, this));
+	const QTabBar::ButtonPosition side = (closeSide == QTabBar::RightSide) ? QTabBar::LeftSide : QTabBar::RightSide;
+
+	for (int i = 0; i < count(); ++i)
+	{
+		const bool isPinned = isPinnedAt(i);
+		auto* button = qobject_cast<QToolButton*>(tabButton(i, side));
+		if (!isPinEnabled || (isPinSimplest && !isPinned))
+		{
+			if (button)
+			{
+				setTabButton(i, side, nullptr);
+				button->deleteLater();
+			}
+			continue;
+		}
+		if (!button)
+		{
+			button = new QToolButton(this);
+			button->setObjectName(QStringLiteral("nplxPinButton"));
+			button->setAutoRaise(true);
+			button->setFocusPolicy(Qt::NoFocus);
+			button->setIconSize(QSize(14, 14));
+			connect(button, &QToolButton::clicked, this, [this, button]() {
+				for (int j = 0; j < count(); ++j)
+				{
+					if (tabButton(j, QTabBar::LeftSide) == button || tabButton(j, QTabBar::RightSide) == button)
+					{
+						emit tabPinClicked(j);
+						return;
+					}
+				}
+			});
+			setTabButton(i, side, button);
+		}
+		button->setIcon(isPinned ? _pinnedIcon : _pinIcon);
+		button->setToolTip(isPinned ? tr("Unpin Tab") : tr("Pin Tab"));
+		button->setVisible(isPinned || onInactiveTabs || i == currentIndex());
+	}
+}
+
+bool DocTabView::isPinnedAt(int index) const
+{
+	BufferID id = getBufferByIndex(static_cast<size_t>(index));
+	return id != BUFFER_INVALID && MainFileManager.getBufferByID(id)->isPinned();
+}
+
+void DocTabView::keepPinnedTabsFirst()
+{
+	int firstUnpinned = 0;
+	for (int i = 0; i < count(); ++i)
+	{
+		if (!isPinnedAt(i))
+			continue;
+		if (i != firstUnpinned)
+			moveTab(i, firstUnpinned);
+		++firstUnpinned;
 	}
 }
 
@@ -197,6 +344,28 @@ void DocTabView::tabInserted(int index)
 {
 	QTabBar::tabInserted(index);
 	updateCloseButtons();
+	updatePinButtons();
+}
+
+void DocTabView::mousePressEvent(QMouseEvent* event)
+{
+	_isDragging = (event->button() == Qt::LeftButton) && tabAt(event->position().toPoint()) >= 0;
+	_dragStartPos = event->position().toPoint();
+	QTabBar::mousePressEvent(event);
+}
+
+void DocTabView::mouseReleaseEvent(QMouseEvent* event)
+{
+	const bool wasDragging = _isDragging && (event->button() == Qt::LeftButton)
+		&& (event->position().toPoint() - _dragStartPos).manhattanLength() >= QApplication::startDragDistance();
+	_isDragging = false;
+	QTabBar::mouseReleaseEvent(event);
+	if (wasDragging)
+		keepPinnedTabsFirst();
+
+	// upstream TabBarPlus: a tab dropped outside of the tab bar (TCN_TABDROPPEDOUTSIDE)
+	if (wasDragging && !rect().contains(event->position().toPoint()))
+		emit tabDroppedOutside(event->globalPosition().toPoint(), event->modifiers() & Qt::ControlModifier);
 }
 
 void DocTabView::mouseDoubleClickEvent(QMouseEvent* event)
@@ -335,16 +504,30 @@ BufferID DocTabView::findBufferByName(const wchar_t* fullfilename) const
 	return BUFFER_INVALID;
 }
 
-void DocTabView::tabToStart()
+void DocTabView::tabToStart(int index)
 {
-	const int index = currentIndex();
-	if (index > 0)
-		moveTab(index, 0);
+	if (index < 0 || index >= count())
+		index = currentIndex();
+	if (index <= 0)
+		return;
+	const bool isPinned = isPinnedAt(index);
+	int i = index;
+	while (i > 0 && isPinnedAt(i - 1) == isPinned)
+		--i;
+	if (i != index)
+		moveTab(index, i);
 }
 
-void DocTabView::tabToEnd()
+void DocTabView::tabToEnd(int index)
 {
-	const int index = currentIndex();
-	if (index >= 0 && index < count() - 1)
-		moveTab(index, count() - 1);
+	if (index < 0 || index >= count())
+		index = currentIndex();
+	if (index < 0)
+		return;
+	const bool isPinned = isPinnedAt(index);
+	int i = index;
+	while (i < count() - 1 && isPinnedAt(i + 1) == isPinned)
+		++i;
+	if (i != index)
+		moveTab(index, i);
 }

@@ -12,11 +12,49 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
 | 7. Dialogs and tools | ✅ Done (2026‑10‑25): macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages), Find characters in range, Edit Popup ContextMenu, style theme import |
-| 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates, printing; runtime localization, tray icon, Move / Open in New Instance next |
+| 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates, printing, Move / Open in New Instance, Pin Tab, tray icon, desktop light / dark switch, theme tab colours, most dialogs translated; Preferences / Find / Style Configurator / UDL translations and runtime language reload next |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.7); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.8); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.7** (2026‑10‑26): sessions 10–17 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.8** (2026‑10‑26): sessions 10–19 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 19 (2026‑10‑26): version 0.8 — Pin Tab, tray icon, dialog translations
+
+- **Print dialog:** opens with its options expanded, and Print to File suggests `<file folder>/<name>.pdf` (the home
+  folder for an untitled document). Qt has no API for either, so the widgets are found by role, a no-op if missing.
+- **Pin Tab** (`IDM_PINTAB`, upstream pinned tabs): a pin button on each tab (`tab_pin.svg` / `tab_pinned.svg`),
+  pinned tabs stay first (Move to Start / End and drags respect them), kept in sessions; a pinned or monitored
+  document keeps its state when moved to the other view (`docGotoAnotherEditView`).
+- **Tray icon** (Preferences › MISC, now enabled): minimize / close to tray with upstream's tray menu labels;
+  floating panels and dialogs are hidden on the way in and shown again on restore. A file sent from another launch,
+  or opened again while in the tray, restores the window.
+- **Follow the desktop light / dark switch** (QStyleHints::colorSchemeChanged) when dark mode follows Windows/the desktop.
+- **Theme tab colours** (Global Styles › Active tab focused / unfocused indicator, Active tab text, Inactive tabs):
+  applied only when they differ from upstream's defaults, so the NotePadLX tab look stays unless a theme or the user
+  changes them; top bar colours in both modes, text / background in light mode, as upstream.
+- **Dialog translations** (`ui/LocalizationQt.*`, port of `changeDlgLang`): the nativeLang.xml `<Dialog>` entries are
+  applied by upstream control ID; hand-built Qt dialogs tag their controls with the ID (`nplx::setCtrlId`). Done:
+  Go to Line, Windows, Debug Info, Incremental Search, the MD5 / SHA dialogs, Run, Run Macro, Column
+  Editor, Shortcut Mapper and its Shortcut dialog, Find characters in range. Still to do: Preferences, Find / Replace, Style Configurator, UDL, the
+  tab language context menu, reload without a restart.
+- **Tests:** print dialog, pinning, tray, colour scheme switch (skips on offscreen; passed on Wayland), tab colours.
+  17/17 suites pass.
+- **Next:** the remaining Phase 8 translations, then Phase 9 (plugins).
+
+## Session 18 (2026‑10‑26): Move / Open in New Instance
+
+- **View › Move/Clone › Move to New Instance / Open in New Instance**, also in the tab context menu
+  (`Notepad_plus::docOpenInNewInstance`): starts `<notepadlx> "<file>" -multiInst -nosession [-x -y] [-l<lang>]
+  -n<line> -c<column>` through `UiServices::startDetached` (QProcess::startDetached in place of upstream `Command`).
+  Move closes the document here, and closes the window when nothing else is open (`noOpenedDoc`). Disabled for an
+  untitled or modified document (`checkDocState`), as upstream.
+- **A tab dragged out of the tab bar** (upstream TCN_TABDROPPEDOUTSIDE, `DocTabView::tabDroppedOutside`): dropped on
+  its own view, the Move / Clone to Other View menu; on the other view, the document goes there (Ctrl: cloned);
+  outside of the window, a new instance (Ctrl: opened, not moved). Wayland cannot find another NotePadLX window under
+  the mouse and places the new window itself, so `-x -y` are only a hint.
+- **Tests:** `tst_commands` `documentInNewInstance` (the command line, clone vs. move, a failed start, disabled when
+  modified); the "unported command" checks now use Settings › Import plugin(s)…. 17/17 suites pass.
+- **Next:** Phase 8: runtime localization of the dialogs, the tray icon.
 
 ## Session 17 (2026‑10‑26): version 0.7 — printing
 
@@ -256,7 +294,7 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 8 | View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
+| 8 | Localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |
 

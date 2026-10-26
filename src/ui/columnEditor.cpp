@@ -29,6 +29,7 @@
 #include <QTimer>
 #include <QToolTip>
 
+#include "LocalizationQt.h"
 #include "Scintilla.h"
 
 #include "Common.h"
@@ -114,7 +115,7 @@ void ColumnEditorDlg::create()
 
 	_isUpdatingControls = wasUpdating;
 	switchTo(colEditParam._mainChoice);
-	// NPLX_TODO(Phase 8): nativeLangSpeaker->changeDlgLang(_hSelf, "ColumnEditor")
+	nplx::changeDlgLang(*this, "ColumnEditor");
 }
 
 void ColumnEditorDlg::onCommand(int id, int notification)
