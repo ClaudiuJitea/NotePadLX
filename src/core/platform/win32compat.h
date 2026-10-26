@@ -173,6 +173,8 @@ constexpr DWORD MAKELONG(WORD a, WORD b) { return static_cast<DWORD>(a) | (stati
 // ---------------------------------------------------------------------------
 #define WM_USER 0x0400
 #define WM_COMMAND 0x0111 // NPLX: message ids kept for the internal dispatcher (Notepad_plus::nppMessage)
+#define WM_MOUSEWHEEL 0x020A // NPLX: the editor forwards a wheel turned with the right button down
+#define MK_RBUTTON 0x0002
 #define WM_APP  0x8000
 
 // MessageBox-style flags used by upstream non-UI code paths (mapped to Qt dialogs in ui/)

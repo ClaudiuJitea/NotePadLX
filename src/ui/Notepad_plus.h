@@ -497,6 +497,8 @@ private:
 
 	std::unique_ptr<QtNppMenu> _mainMenuHandle; // NppMenu view of the menu bar (upstream _mainMenuHandle)
 	ContextMenu _tabPopupMenu;
+	ScintillaEditView* _pendingContextMenuView = nullptr; // a right press waits for the release (eventFilter)
+	QPoint _pendingContextMenuPos;
 	FindReplaceDlg* _findReplaceDlg = nullptr;
 	class FindIncrementDlg* _incrementFindDlg = nullptr; // upstream _incrementFindDlg
 	class QToolBar* _incrementFindBar = nullptr;           // NPLX: the row of the incremental search bar

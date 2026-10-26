@@ -202,6 +202,10 @@ void Notepad_plus::setupEditView(ScintillaEditView* view)
 	view->execute(SCI_SETUNDOSELECTIONHISTORY, SC_UNDO_SELECTION_HISTORY_ENABLED | SC_UNDO_SELECTION_HISTORY_SCROLL);
 
 	connect(view, &ScintillaEditBase::notify, this, &Notepad_plus::onScintillaNotify);
+	// upstream ::SendMessage(_hParent, ...) from the editor (e.g. WM_MOUSEWHEEL with the right button down)
+	connect(view, &ScintillaEditView::nppMessage, this, [this](unsigned int message, uptr_t wParam, sptr_t lParam) {
+		nppMessage(message, wParam, lParam);
+	});
 	view->viewport()->installEventFilter(this); // context menu (upstream WM_CONTEXTMENU)
 	// Files dropped on the text (upstream WM_DROPFILES); Scintilla's Qt widget reports them as URIs
 	connect(view, &ScintillaEditBase::uriDropped, this, [this, view](const QString& uri) {
@@ -2694,6 +2698,19 @@ bool Notepad_plus::eventFilter(QObject* watched, QEvent* event)
 		}
 	}
 
+	if (event->type() == QEvent::MouseButtonRelease && static_cast<QMouseEvent*>(event)->button() == Qt::RightButton
+		&& _pendingContextMenuView && watched == _pendingContextMenuView->viewport())
+	{
+		// upstream WM_CONTEXTMENU: none after the right button + wheel switched documents
+		ScintillaEditView* view = _pendingContextMenuView;
+		_pendingContextMenuView = nullptr;
+		NppParameters& nppParam = NppParameters::getInstance();
+		if (nppParam._isTaskListRBUTTONUP_Active)
+			nppParam._isTaskListRBUTTONUP_Active = false;
+		else
+			showEditorContextMenu(view, _pendingContextMenuPos);
+	}
+
 	if (event->type() == QEvent::ContextMenu)
 	{
 		// upstream: Scintilla doesn't show its own popup (SC_POPUP_NEVER), WM_CONTEXTMENU reaches the main window
@@ -2707,6 +2724,21 @@ bool Notepad_plus::eventFilter(QObject* watched, QEvent* event)
 		{
 			auto* contextEvent = static_cast<QContextMenuEvent*>(event);
 			QPoint p = contextEvent->globalPos();
+			NppParameters& nppParam = NppParameters::getInstance();
+			if (contextEvent->reason() == QContextMenuEvent::Mouse && nppParam._isTaskListRBUTTONUP_Active)
+			{
+				// upstream WM_CONTEXTMENU after the right button + wheel switched documents (a release-time menu)
+				nppParam._isTaskListRBUTTONUP_Active = false;
+				return true;
+			}
+			if (contextEvent->reason() == QContextMenuEvent::Mouse && (QGuiApplication::mouseButtons() & Qt::RightButton))
+			{
+				// NPLX: Qt sends it on the press on Linux; as on Windows, the menu opens when the button is released,
+				// so that the wheel can switch documents meanwhile (WM_MOUSEWHEEL with MK_RBUTTON)
+				_pendingContextMenuView = view;
+				_pendingContextMenuPos = p;
+				return true;
+			}
 			if (contextEvent->reason() == QContextMenuEvent::Keyboard)
 			{
 				// context menu activated via keyboard; pop up at text caret position

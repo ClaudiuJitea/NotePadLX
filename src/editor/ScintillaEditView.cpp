@@ -387,7 +387,15 @@ void ScintillaEditView::init()
 
 void ScintillaEditView::wheelEvent(QWheelEvent* event)
 {
-	// NPLX_TODO(Phase 2): right button + wheel switches tabs (upstream forwards it to the parent)
+	if (event->buttons() & Qt::RightButton)
+	{
+		// upstream: MK_RBUTTON goes to the parent, which switches documents (IDC_PREV_DOC / IDC_NEXT_DOC)
+		const int delta = event->angleDelta().y();
+		if (delta != 0)
+			emit nppMessage(WM_MOUSEWHEEL, MK_RBUTTON | (static_cast<uptr_t>(static_cast<uint16_t>(delta)) << 16), 0);
+		event->accept();
+		return;
+	}
 	if ((event->modifiers() & Qt::ShiftModifier) && event->angleDelta().y() != 0 && event->angleDelta().x() == 0)
 	{
 		// move 3 columns at a time

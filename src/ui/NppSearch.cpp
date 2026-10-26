@@ -154,6 +154,19 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 {
 	switch (message)
 	{
+		case WM_MOUSEWHEEL:
+		{
+			if (0 != (LOWORD(wParam) & MK_RBUTTON))
+			{
+				// redirect to the IDC_PREV_DOC or IDC_NEXT_DOC so that we have the unified process
+
+				NppParameters::getInstance()._isTaskListRBUTTONUP_Active = true;
+				short zDelta = (short) HIWORD(wParam);
+				command(zDelta > 0 ? IDC_PREV_DOC : IDC_NEXT_DOC);
+			}
+			return TRUE;
+		}
+
 		case WM_REPLACEALL_INOPENEDDOC:
 		{
 			replaceInOpenedFiles();

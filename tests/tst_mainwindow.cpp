@@ -533,6 +533,67 @@ private slots:
 		tabMenu.action(IDM_FILE_CLOSE)->trigger();
 		QCOMPARE(tabOf(_npp->currentView())->nbItem(), before - 1);
 	}
+
+	void rightButtonWheelSwitchesDocuments()
+	{
+		// upstream WM_MOUSEWHEEL with MK_RBUTTON: the previous / next document, and no context menu on the release
+		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+		const bool doTaskList = nppGUI._doTaskList;
+		nppGUI._doTaskList = false;
+		_npp->command(IDM_FILE_NEW);
+		_npp->command(IDM_FILE_NEW);
+		DocTabView* tab = _npp->getDocTab(MAIN_VIEW);
+		QVERIFY(tab->nbItem() >= 3);
+		_npp->activateDoc(1);
+		QCOMPARE(tab->getCurrentTabIndex(), 1);
+
+		QWidget* viewport = currentView()->viewport();
+		const QPoint pos(50, 30);
+		bool menuShown = false;
+		auto closeMenu = [&menuShown]() {
+			QTimer::singleShot(50, [&menuShown]() {
+				if (QWidget* popup = QApplication::activePopupWidget())
+				{
+					menuShown = true;
+					popup->close();
+				}
+			});
+		};
+		auto rightButtonWheel = [&](int delta) {
+			QWheelEvent wheel(QPointF(pos), QPointF(viewport->mapToGlobal(pos)), QPoint(), QPoint(0, delta), Qt::RightButton,
+				Qt::NoModifier, Qt::NoScrollPhase, false);
+			QApplication::sendEvent(viewport, &wheel);
+		};
+
+		// as Qt does it on Linux: the context menu event comes with the press
+		auto rightPress = [&]() {
+			QTest::mousePress(viewport, Qt::RightButton, Qt::NoModifier, pos);
+			QContextMenuEvent contextEvent(QContextMenuEvent::Mouse, pos, viewport->mapToGlobal(pos));
+			QApplication::sendEvent(viewport, &contextEvent);
+		};
+		QVERIFY(NppParameters::getInstance().hasCustomContextMenu());
+
+		rightPress();
+		rightButtonWheel(-120); // down: next document
+		QCOMPARE(tab->getCurrentTabIndex(), 2);
+		rightButtonWheel(120); // up: previous
+		rightButtonWheel(120);
+		QCOMPARE(tab->getCurrentTabIndex(), 0);
+		closeMenu();
+		QTest::mouseRelease(viewport, Qt::RightButton, Qt::NoModifier, pos);
+		QTest::qWait(100);
+		QVERIFY(!menuShown);
+		QVERIFY(!NppParameters::getInstance()._isTaskListRBUTTONUP_Active);
+
+		// a right click without the wheel: the menu, on the release
+		rightPress();
+		QVERIFY(!QApplication::activePopupWidget()); // not on the press
+		closeMenu();
+		QTest::mouseRelease(viewport, Qt::RightButton, Qt::NoModifier, pos);
+		QTest::qWait(100);
+		QVERIFY(menuShown);
+		nppGUI._doTaskList = doTaskList;
+	}
 };
 
 QTEST_MAIN(TestMainWindow)
