@@ -735,6 +735,7 @@ std::vector<wstring> Notepad_plus::loadCommandlineParams(const std::vector<wstri
 	intptr_t positionNumber = pCmdParams->_pos2go;
 	bool recursive = pCmdParams->_isRecursive;
 	bool readOnly = pCmdParams->_isReadOnly;
+	bool monitorFiles = pCmdParams->_monitorFiles;
 	bool openFoldersAsWorkspace = pCmdParams->_openFoldersAsWorkspace;
 
 	if (openFoldersAsWorkspace)
@@ -797,7 +798,11 @@ std::vector<wstring> Notepad_plus::loadCommandlineParams(const std::vector<wstri
 			switchEditViewTo(iView);	//restore view
 		}
 
-		// NPLX_TODO(Phase 3): monitorFiles (monitoringStartOrStopAndUpdateUI + createMonitoringThread)
+		if (monitorFiles)
+		{
+			monitoringStartOrStopAndUpdateUI(pBuf, true);
+			createMonitoringThread(pBuf);
+		}
 	}
 	if (lastOpened != BUFFER_INVALID)
 	{

@@ -392,8 +392,8 @@ public:
 
 	bool isLargeFile() const { return _isLargeFile; }
 
-	// NPLX: upstream signals the monitoring thread with a Win32 event (getMonitoringEvent).
-	// NPLX_TODO(Phase 3): file monitoring ("tail -f" mode) with QFileSystemWatcher reads _isMonitoringOn.
+	// NPLX: upstream signals the monitoring thread with a Win32 event (getMonitoringEvent); the QFileSystemWatcher of
+	// Notepad_plus::createMonitoringThread reads _isMonitoringOn.
 	void startMonitoring() {
 		_isMonitoringOn = true;
 	}

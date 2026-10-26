@@ -397,6 +397,33 @@ private slots:
 		QVERIFY(!buf->getUserReadOnly());
 	}
 
+	void commandLineMonitor()
+	{
+		// upstream -monitor: the files are opened in "tail -f" mode, and follow what is appended
+		const QString path = _tmp.path() + "/monitored.log";
+		writeFile(path, "first\n");
+		CmdLineParamsDTO dto;
+		dto._line2go = -1;
+		dto._column2go = -1;
+		dto._pos2go = -1;
+		dto._monitorFiles = true;
+		_npp->loadCommandlineParams({ path.toStdWString() }, &dto);
+
+		Buffer* buf = currentView()->getCurrentBuffer();
+		QCOMPARE(QString::fromWCharArray(buf->getFullPathName()), path);
+		QVERIFY(buf->isMonitoringOn());
+		QVERIFY(buf->getUserReadOnly());
+
+		{
+			std::ofstream out(path.toStdString(), std::ios::app);
+			out << "second\n";
+		}
+		QTRY_VERIFY_WITH_TIMEOUT(QString::fromStdString(currentView()->getText()).contains(QStringLiteral("second")), 5000);
+
+		_npp->command(IDM_VIEW_MONITORING); // stop
+		QVERIFY(!buf->isMonitoringOn());
+	}
+
 	void externalChangeIsDetected()
 	{
 		// A file changed by another program: on activation the user is asked; "Yes" reloads it
