@@ -159,6 +159,8 @@ add_library(nplx_ui STATIC
     ui/md5Dlgs_rc.h
     ui/RcHashDialogs.inc
     ui/NppPreferences.cpp
+    ui/Printer.cpp
+    ui/Printer.h
     ui/preferenceDlg.cpp
     ui/preferenceDlg.h
     ui/preference_rc.h
@@ -180,7 +182,7 @@ add_custom_command(
 target_sources(nplx_ui PRIVATE ${NPLX_PORTED_COMMANDS_INC})
 target_include_directories(nplx_ui PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
 target_include_directories(nplx_ui PUBLIC ui)
-target_link_libraries(nplx_ui PUBLIC nplx_editor Qt6::Widgets Qt6::DBus Qt6::Network)
+target_link_libraries(nplx_ui PUBLIC nplx_editor Qt6::Widgets Qt6::DBus Qt6::Network Qt6::PrintSupport)
 target_compile_options(nplx_ui PRIVATE ${NPLX_WARNINGS})
 file(READ ${PROJECT_SOURCE_DIR}/third_party/scintilla/version.txt NPLX_SCINTILLA_VERSION)
 file(READ ${PROJECT_SOURCE_DIR}/third_party/lexilla/version.txt NPLX_LEXILLA_VERSION)

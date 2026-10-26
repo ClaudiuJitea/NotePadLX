@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="0.7" date="2026-10-26">
+      <description>
+        <p>Printing (File &gt; Print with the headers, footers and margins of Preferences &gt; Print, and Print Now), Incremental Search, tab colours, Load / Save Session, Find characters in range, theme import and Edit Popup ContextMenu.</p>
+      </description>
+    </release>
     <release version="0.6" date="2026-10-25">
       <description>
         <p>Settings &gt; Preferences: the 23 pages of Notepad++, applied at once (tab bar, toolbar icons and colours, dark mode tones, editing, margins, languages, default directory and more). The Find dialog keeps one layout for all its tabs.</p>

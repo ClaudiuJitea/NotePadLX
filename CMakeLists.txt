@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.24)
 
 project(NotePadLX
-    VERSION 0.6
+    VERSION 0.7
     DESCRIPTION "Linux port of Notepad++"
     HOMEPAGE_URL "https://github.com/ClaudiuJitea/NotePadLX"
     LANGUAGES C CXX)
@@ -19,7 +19,7 @@ option(NPLX_BUILD_TESTS "Build NotePadLX tests" ON)
 # A development build also finds data/ in the source tree; packages use only <prefix>/share/notepadlx
 option(NPLX_USE_SOURCE_DATA_DIR "Fall back to the source tree's data/ directory" ON)
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Core5Compat DBus Network)
+find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Core5Compat DBus Network PrintSupport)
 
 add_subdirectory(third_party)
 add_subdirectory(src)

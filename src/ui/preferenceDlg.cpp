@@ -2861,8 +2861,6 @@ void PrintSubDlg::initDialog()
 	for (int edit : { IDC_EDIT_HLEFT, IDC_EDIT_HMIDDLE, IDC_EDIT_HRIGHT, IDC_EDIT_FLEFT, IDC_EDIT_FMIDDLE, IDC_EDIT_FRIGHT })
 		dlgItem(edit)->installEventFilter(this);
 
-	// NPLX: File > Print is not ported yet (Phase 8); the settings are kept in config.xml
-	dlgItem(IDC_CHECK_PRINTLINENUM)->setToolTip(QStringLiteral("Printing is not ported to NotePadLX yet; these settings are saved."));
 }
 
 bool PrintSubDlg::eventFilter(QObject* watched, QEvent* event)

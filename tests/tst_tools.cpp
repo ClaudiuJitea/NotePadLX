@@ -29,12 +29,17 @@
 #include <QToolButton>
 #include <QMenuBar>
 #include <QTemporaryDir>
+#include <QStandardPaths>
+#include <QRegularExpression>
+#include <QProcess>
+#include <QPdfWriter>
 
 #include <cstdlib>
 
 #include "DocTabView.h"
 #include "NppDarkMode.h"
 #include "Notepad_plus.h"
+#include "Printer.h"
 #include "Parameters.h"
 #include "QtUiServices.h"
 #include "ScintillaEditView.h"
@@ -534,6 +539,102 @@ private slots:
 			if ((id >= IDM_VIEW_TAB_COLOUR_1 && id <= IDM_VIEW_TAB_COLOUR_5) || id == IDM_SEARCH_GONEXTMARKER1)
 				QVERIFY2(!a->icon().isNull(), qPrintable(a->text()));
 		}
+		_npp->command(IDM_FILE_CLOSE);
+	}
+
+	void printToPdf()
+	{
+		// File > Print... (upstream Printer): Scintilla's FORMATRANGE on a paged device, with the header and footer
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_FILE_PRINT));
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_FILE_PRINTNOW));
+		const QString pdftotext = QStandardPaths::findExecutable(QStringLiteral("pdftotext"));
+		const QString pdfinfo = QStandardPaths::findExecutable(QStringLiteral("pdfinfo"));
+		if (pdftotext.isEmpty() || pdfinfo.isEmpty())
+			QSKIP("pdftotext / pdfinfo (poppler-utils) are needed to read the printed PDF");
+
+		const QString fn = _tmp.filePath(QStringLiteral("printme.txt"));
+		{
+			QFile f(fn);
+			QVERIFY(f.open(QIODevice::WriteOnly));
+			for (int i = 1; i <= 150; ++i)
+				f.write(QStringLiteral("line %1 of the printed text\n").arg(i).toUtf8());
+		}
+		const BufferID id = _npp->doOpen(fn.toStdWString());
+		QVERIFY(id != BUFFER_INVALID);
+		_npp->switchToFile(id);
+
+		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+		const PrintSettings saved = nppGUI._printSettings;
+		nppGUI._printSettings._headerLeft = L"$(FILE_NAME)";
+		nppGUI._printSettings._headerRight = L"page $(CURRENT_PRINTING_PAGE)";
+		nppGUI._printSettings._footerMiddle = L"The footer";
+
+		auto print = [this](const QString& pdf, bool selection = false, int from = 0, int to = 0) {
+			QPdfWriter writer(pdf);
+			writer.setPageSize(QPageSize(QPageSize::A4));
+			writer.setResolution(300);
+			Printer printer;
+			const auto range = _npp->getActiveEditView()->getSelection();
+			printer.init(_npp.get(), [this](unsigned int m, uptr_t w, sptr_t l) { return _npp->nppMessage(m, w, l); },
+				_npp->getActiveEditView(), false, range.cpMin, range.cpMax);
+			return printer.doPrint(writer, true, selection, from, to);
+		};
+		auto readPdf = [&](const QString& pdf) {
+			QProcess p;
+			p.start(pdftotext, { QStringLiteral("-layout"), pdf, QStringLiteral("-") });
+			p.waitForFinished();
+			return QString::fromUtf8(p.readAllStandardOutput());
+		};
+		auto pageCount = [&](const QString& pdf) {
+			QProcess p;
+			p.start(pdfinfo, { pdf });
+			p.waitForFinished();
+			const QString info = QString::fromUtf8(p.readAllStandardOutput());
+			const QRegularExpressionMatch m = QRegularExpression(QStringLiteral("Pages:\\s+(\\d+)")).match(info);
+			return m.hasMatch() ? m.captured(1).toInt() : -1;
+		};
+
+		// the whole document: several pages, each with its header and footer
+		const QString all = _tmp.filePath(QStringLiteral("all.pdf"));
+		const size_t pages = print(all);
+		QVERIFY2(pages >= 2, qPrintable(QString::number(pages)));
+		QCOMPARE(pageCount(all), static_cast<int>(pages));
+		const QString text = readPdf(all);
+		QVERIFY(text.contains(QStringLiteral("line 1 of the printed text")));
+		QVERIFY(text.contains(QStringLiteral("line 150 of the printed text")));
+		QVERIFY(text.contains(QStringLiteral("printme.txt")));
+		QVERIFY(text.contains(QStringLiteral("page 2")));
+		QVERIFY(text.contains(QStringLiteral("The footer")));
+
+		// a page range
+		const QString second = _tmp.filePath(QStringLiteral("second.pdf"));
+		QCOMPARE(print(second, false, 2, 2), size_t(2)); // the pages counted up to the last printed one
+		QCOMPARE(pageCount(second), 1);
+		QVERIFY(readPdf(second).contains(QStringLiteral("page 2")));
+		QVERIFY(!readPdf(second).contains(QStringLiteral("line 1 of the printed text")));
+
+		// the selection only
+		ScintillaEditView* view = _npp->getActiveEditView();
+		const auto lineStart = view->execute(SCI_POSITIONFROMLINE, 9);
+		const auto lineEnd = view->execute(SCI_GETLINEENDPOSITION, 10);
+		view->execute(SCI_SETSEL, lineStart, lineEnd);
+		const QString sel = _tmp.filePath(QStringLiteral("sel.pdf"));
+		QCOMPARE(print(sel, true), size_t(1));
+		const QString selText = readPdf(sel);
+		QVERIFY(selText.contains(QStringLiteral("line 10 of the printed text")));
+		QVERIFY(selText.contains(QStringLiteral("line 11 of the printed text")));
+		QVERIFY(!selText.contains(QStringLiteral("line 12 of the printed text")));
+		view->execute(SCI_SETSEL, 0, 0);
+
+		// a form feed starts a new page
+		view->execute(SCI_SETTEXT, 0, reinterpret_cast<sptr_t>("first page\n\fsecond page\n"));
+		nppGUI._printSettings._printFormFeedPageBreak = true;
+		const QString ff = _tmp.filePath(QStringLiteral("ff.pdf"));
+		QCOMPARE(print(ff), size_t(2));
+		QCOMPARE(pageCount(ff), 2);
+
+		nppGUI._printSettings = saved;
+		view->execute(SCI_SETSAVEPOINT);
 		_npp->command(IDM_FILE_CLOSE);
 	}
 

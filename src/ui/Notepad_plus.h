@@ -186,6 +186,7 @@ public:
 	bool doReload(BufferID id, bool alert = true);
 	void fileNew();
 	void fileOpen();
+	void filePrint(bool showDialog); // File > Print... (with the dialog) and Print Now
 	bool fileLoadSession(const wchar_t* fn = nullptr);
 	const wchar_t* fileSaveSession(size_t nbFile, wchar_t** fileNames, const wchar_t* sessionFile2save, bool includeFileBrowser = false);
 	const wchar_t* fileSaveSession(size_t nbFile = 0, wchar_t** fileNames = nullptr);

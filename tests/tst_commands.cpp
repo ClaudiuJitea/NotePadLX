@@ -141,8 +141,8 @@ private slots:
 			QVERIFY2(action(id)->isEnabled(), qPrintable(QString::number(id)));
 		}
 		// still disabled with a tooltip
-		QVERIFY(!action(IDM_FILE_PRINT)->isEnabled());
-		QCOMPARE(action(IDM_FILE_PRINT)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
+		QVERIFY(!action(IDM_VIEW_GOTO_NEW_INSTANCE)->isEnabled());
+		QCOMPARE(action(IDM_VIEW_GOTO_NEW_INSTANCE)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
 	}
 
 	void sortLines()

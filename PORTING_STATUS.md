@@ -12,11 +12,26 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
 | 7. Dialogs and tools | ✅ Done (2026‑10‑25): macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages), Find characters in range, Edit Popup ContextMenu, style theme import |
-| 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
+| 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates, printing; runtime localization, tray icon, Move / Open in New Instance next |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.6); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.7); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.6** (2026‑10‑25): sessions 10–14 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.7** (2026‑10‑26): sessions 10–17 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 17 (2026‑10‑26): version 0.7 — printing
+
+- **File › Print… (Ctrl+P) and Print Now** (`ui/Printer.*`, port of upstream `ScintillaComponent/Printer`): QPrintDialog
+  in place of PrintDlg (all pages, a page range, or the selection when there is one; print to file / PDF comes with
+  it), Print Now uses the default printer. The page is printed by Scintilla's SCI_FORMATRANGEFULL: on Qt a SurfaceID is
+  a QPaintDevice, and the Qt surface draws with the device's active QPainter, which also draws the header and footer.
+  As upstream: the user margins (mm) on top of the unprintable area, the header and footer fonts, their left / middle /
+  right parts with $(SHORT_DATE) $(LONG_DATE) $(TIME) $(CURRENT_PRINTING_PAGE) and the Run variables
+  ($(FILE_NAME)...), the lines under the header and over the footer, line numbers on or off, the colour mode, form
+  feed page breaks. Dates follow the desktop locale (upstream GetDateFormat / GetTimeFormat). `Printer::doPrint`
+  takes any QPagedPaintDevice (QPrinter, QPdfWriter). Qt Print Support is linked (part of `qt6-base-dev`).
+- **Tests:** `tst_tools` `printToPdf` (prints to PDF with QPdfWriter, reads it back with poppler's pdfinfo /
+  pdftotext: all pages, the header and footer variables, a page range, the selection, form feeds). 17/17 suites pass.
+- **Next:** Phase 8: runtime localization of the dialogs, the tray icon, Move / Open in New Instance.
 
 ## Session 16 (2026‑10‑26): tab colours, incremental search
 
@@ -241,7 +256,7 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 8 | File › Print… (Ctrl+P), Print Now; View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
+| 8 | View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |
 

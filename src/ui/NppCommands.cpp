@@ -529,6 +529,14 @@ void Notepad_plus::command(int id)
 			break;
 		}
 
+		case IDM_FILE_PRINT :
+			filePrint(true);
+			break;
+
+		case IDM_FILE_PRINTNOW :
+			filePrint(false);
+			break;
+
 		case IDM_SETTING_PREFERENCE:
 		{
 			// upstream: _preference.doDialog(isRTL); NPLX: created on first use, with the messages to this window

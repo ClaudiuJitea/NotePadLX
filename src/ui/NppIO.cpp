@@ -42,6 +42,7 @@
 
 #include "DocTabView.h"
 #include "Parameters.h"
+#include "Printer.h"
 #include "ScintillaEditView.h"
 #include "UiServices.h"
 #include "menuCmdID.h"
@@ -340,6 +341,18 @@ void Notepad_plus::fileOpen()
 	{
 		switchToFile(lastOpened);
 	}
+}
+
+void Notepad_plus::filePrint(bool showDialog)
+{
+	Printer printer;
+
+	intptr_t startPos = _pEditView->execute(SCI_GETSELECTIONSTART);
+	intptr_t endPos = _pEditView->execute(SCI_GETSELECTIONEND);
+
+	printer.init(this, [this](unsigned int message, uptr_t wParam, sptr_t lParam) { return nppMessage(message, wParam, lParam); },
+		_pEditView, showDialog, startPos, endPos, _nativeLangSpeaker.isRTL());
+	printer.doPrint();
 }
 
 bool Notepad_plus::fileReload()
