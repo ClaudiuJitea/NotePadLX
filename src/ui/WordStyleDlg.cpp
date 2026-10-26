@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "LocalizationQt.h"
 #include "WordStyleDlg.h"
 
 #include "DocumentMap.h" // ViewZoneDlg
@@ -40,8 +39,10 @@
 #include "ColourPicker.h"
 #include "Common.h"
 #include "DocTabView.h"
+#include "LocalizationQt.h"
 #include "NppConstants.h"
 #include "NppDarkMode.h"
+#include "NppDarkModeOptions.h"
 #include "WordStyleDlgRes.h"
 #include "localization.h"
 #include "resource.h"
@@ -492,7 +493,9 @@ void WordStyleDlg::command(int id)
 			enableItem(IDC_SAVECLOSE_BUTTON, false);
 			hide();
 
-			// NPLX_TODO(Phase 8): NppDarkMode::setThemeName (dark mode theme pairing)
+			// upstream: the theme is the one of the current mode (Preferences > Dark Mode switches between the two)
+			const std::wstring fn = PathFindFileName(_themeName.c_str());
+			NppDarkMode::setThemeName((!NppDarkMode::isEnabled() && fn == L"stylers.xml") ? L"" : fn);
 			return;
 		}
 

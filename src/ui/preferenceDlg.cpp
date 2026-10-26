@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "LocalizationQt.h"
 #include "preferenceDlg.h"
 
 #include <algorithm>
@@ -51,6 +50,7 @@
 #include "ColourPicker.h"
 #include "Common.h"
 #include "EncodingMapper.h"
+#include "LocalizationQt.h"
 #include "Notepad_plus_msgs.h"
 #include "NppConstants.h"
 #include "NppDarkMode.h"

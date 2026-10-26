@@ -36,6 +36,8 @@
 #include "SciLexer.h"
 #include "ColourPicker.h"
 #include "Notepad_plus.h"
+#include "NppDarkMode.h"
+#include "NppDarkModeOptions.h"
 #include "Parameters.h"
 #include "QtUiServices.h"
 #include "ScintillaEditView.h"
@@ -170,6 +172,31 @@ private slots:
 
 		selectTheme(themeCombo()->itemText(0)); // Default (stylers.xml)
 		QVERIFY(mainTab->styleSheet().isEmpty());
+	}
+
+	void themeSavedForTheMode()
+	{
+		// upstream NppDarkMode::setThemeName on Save & Close: the theme of the current mode, which Preferences >
+		// Dark Mode loads when the mode changes
+		const bool isDark = NppDarkMode::isEnabled();
+		const int index = themeCombo()->findText(QStringLiteral("Bespin"));
+		QVERIFY(index >= 0);
+		themeCombo()->setCurrentIndex(index);
+		dlg()->command(IDC_SWITCH2THEME_COMBO);
+		dlg()->command(IDC_SAVECLOSE_BUTTON);
+		QCOMPARE(QString::fromStdWString(NppDarkMode::advDefaults(isDark)._xmlFileName), QStringLiteral("Bespin.xml"));
+		QCOMPARE(QString::fromStdWString(NppDarkMode::getThemeName()), QStringLiteral("Bespin.xml"));
+		const std::wstring otherMode = NppDarkMode::advDefaults(!isDark)._xmlFileName;
+
+		// the default theme in light mode: no name (stylers.xml)
+		_npp->command(IDM_LANGSTYLE_CONFIG_DLG);
+		themeCombo()->setCurrentIndex(0);
+		dlg()->command(IDC_SWITCH2THEME_COMBO);
+		dlg()->command(IDC_SAVECLOSE_BUTTON);
+		if (!isDark)
+			QVERIFY(NppDarkMode::advDefaults(false)._xmlFileName.empty());
+		QCOMPARE(NppDarkMode::advDefaults(!isDark)._xmlFileName, otherMode); // the other mode keeps its theme
+		_npp->command(IDM_LANGSTYLE_CONFIG_DLG);
 	}
 
 	void editStyleAndCancel()

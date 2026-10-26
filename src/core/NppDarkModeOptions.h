@@ -49,6 +49,12 @@ namespace NppDarkMode
 		return (theme == L"stylers.xml") ? std::wstring() : theme;
 	}
 
+	// upstream setThemeName: the editor theme to use in the current mode (Style Configurator > Save & Close)
+	inline void setThemeName(const std::wstring& newThemeName)
+	{
+		advDefaults(isEnabled())._xmlFileName = newThemeName;
+	}
+
 	// NPLX: a custom colour of 0 means the accent colour of the desktop (upstream getAccentColor), resolved by the UI
 	inline TbIconInfo getToolbarIconInfo(bool useDark) { return advDefaults(useDark)._tbIconInfo; }
 	inline TbIconInfo getToolbarIconInfo() { return getToolbarIconInfo(isEnabled()); }

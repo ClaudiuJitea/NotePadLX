@@ -15,7 +15,6 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-#include "LocalizationQt.h"
 #include "UserDefineDialog.h"
 
 #include <algorithm>
@@ -38,6 +37,7 @@
 
 #include "ColourPicker.h"
 #include "Common.h"
+#include "LocalizationQt.h"
 #include "NppConstants.h"
 #include "NppXml.h"
 #include "ScintillaEditView.h"
