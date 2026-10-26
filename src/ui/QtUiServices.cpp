@@ -27,7 +27,13 @@
 #include <QPushButton>
 #include <QScreen>
 
+#include <map>
+
 #include "win32compat.h"
+#include "Common.h"
+#include "Parameters.h"
+#include "localization.h"
+#include "resource.h"
 
 int QtUiServices::messageBox(const std::wstring& message, const std::wstring& title, unsigned int type)
 {
@@ -78,12 +84,74 @@ int QtUiServices::messageBox(const std::wstring& message, const std::wstring& ti
 	}
 }
 
-int QtUiServices::networkPathWarning(const std::wstring& path, const std::string&)
+int QtUiServices::networkPathWarning(const std::wstring& path, const std::string& titleTag)
 {
-	// NPLX_TODO(Phase 3): full port of NetworkPathWarningBox (always load / always skip)
-	const int res = messageBox(L"\"" + path + L"\" is on a network location that may be unreachable.\rLoad it?",
-		L"Network path", MB_YESNO | MB_ICONQUESTION);
-	return res == IDYES ? IDOK : IDCANCEL;
+	// upstream NetworkPathWarningBox (IDD_NETWORKPATHWARNINGBOX): Skip, Always load from this server (serverWhiteList.xml),
+	// Always skip network paths, Always load network paths
+	std::wstring title = L"NotePadLX session loading";
+	if (titleTag == "title2")
+		title = L"Clickable file:// link";
+	else if (titleTag == "title3")
+		title = L"Loading toolbarButtonsConf.xml";
+	else if (titleTag == "title4")
+		title = L"Loading Project Panel XML file";
+	// NPLX: no Windows login is sent on Linux; the server is still contacted
+	std::wstring msg = L"Network Path Warning:\n\n$STR_REPLACE$\n\nLoading this file will contact its server.\n\nLoad anyway?";
+	std::map<int, std::wstring> buttonText = {
+		{ IDCANCEL, L"&Skip" }, { IDYES, L"Always &load from this server" },
+		{ IDNO, L"&Always skip network paths" }, { IDRETRY, L"Always load &network paths" },
+	};
+
+	NppParameters& nppParam = NppParameters::getInstance();
+	if (const NativeLangSpeaker* speaker = nppParam.getNativeLangSpeaker())
+	{
+		DlgLang lang;
+		if (speaker->getDlgLang("NetworkPathWarning", lang, titleTag.empty() ? nullptr : titleTag.c_str()))
+		{
+			if (!lang._title.empty())
+				title = lang._title;
+			for (const auto& [id, name] : lang._items)
+			{
+				if (id == IDC_NETWORKPATHWARNINGTEXT)
+					msg = name;
+				else if (buttonText.count(id))
+					buttonText[id] = name;
+			}
+		}
+	}
+	msg = stringReplace(msg, L"$STR_REPLACE$", path);
+
+	QMessageBox box(QMessageBox::Warning, QString::fromStdWString(title), QString::fromStdWString(msg), QMessageBox::NoButton,
+		QApplication::activeWindow());
+	std::map<QAbstractButton*, int> ids;
+	for (int id : { IDCANCEL, IDYES, IDNO, IDRETRY })
+	{
+		QPushButton* button = box.addButton(QString::fromStdWString(buttonText[id]),
+			id == IDCANCEL ? QMessageBox::RejectRole : QMessageBox::AcceptRole);
+		ids[button] = id;
+		if (id == IDCANCEL)
+			box.setDefaultButton(button);
+	}
+	box.setEscapeButton(box.defaultButton());
+	box.exec();
+	const auto it = ids.find(box.clickedButton());
+	const int clicked = it == ids.end() ? IDCANCEL : it->second;
+
+	switch (clicked)
+	{
+		case IDYES: // "Always load from this server" - loading of the current net-file will continue
+			nppParam.addServerToWhiteList(wstring2string(path, CP_UTF8).c_str()); // add the current net-file server to whitelist for the future
+			break;
+		case IDNO: // "Always skip network paths" - loading of the current net-file and any subsequent ones will be skipped
+			nppParam.setNetworkPathAlwaysActionInServerWhitelist(NppParameters::networkPathAlwaysSkip);
+			break;
+		case IDRETRY: // "Always load network paths" - loading of the current net-file and any subsequent ones will continue
+			nppParam.setNetworkPathAlwaysActionInServerWhitelist(NppParameters::networkPathAlwaysLoad);
+			break;
+		default: // "Skip" - loading of the current net-file will be skipped
+			break;
+	}
+	return clicked;
 }
 
 SIZE QtUiServices::primaryScreenSize()

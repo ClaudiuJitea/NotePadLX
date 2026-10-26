@@ -30,7 +30,8 @@ extern std::atomic<bool> g_bNppExitFlag;
 
 // Upstream: WinControls/AboutDlg/AboutDlg.h. Same call shape; the dialog is shown by ui/
 // through UiServices::networkPathWarning.
-// Button ids: IDCANCEL = skip once, IDNO = always skip, IDYES = always load, IDOK = load once.
+// Button ids (upstream): IDCANCEL = skip, IDYES = always load from this server, IDNO = always skip network paths,
+// IDRETRY = always load network paths.
 class NetworkPathWarningBox
 {
 public:

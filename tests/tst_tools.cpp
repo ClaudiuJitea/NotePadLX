@@ -17,6 +17,8 @@
 // screenshots.
 
 #include <QtTest>
+#include <QAbstractButton>
+#include <QMessageBox>
 #include <QAction>
 #include <QClipboard>
 #include <QCryptographicHash>
@@ -808,6 +810,48 @@ private slots:
 		view()->execute(SCI_GOTOPOS, 6); // in "target.txt"
 		_npp->command(IDM_EDIT_OPENSELECTEDFILETOEDIT);
 		QCOMPARE(QString::fromStdWString(view()->getCurrentBuffer()->getFullPathName()), target);
+	}
+
+	void networkPathWarningBox()
+	{
+		// upstream NetworkPathWarningBox: four buttons, the choice is kept in serverWhiteList.xml
+		NppParameters& nppParam = NppParameters::getInstance();
+		QtUiServices ui;
+		const std::wstring path = L"\\\\fileserver\\share\\notes.txt";
+		auto answer = [](const QString& buttonStart) {
+			QTimer::singleShot(50, [buttonStart]() {
+				auto* box = qobject_cast<QMessageBox*>(QApplication::activeModalWidget());
+				QVERIFY(box);
+				QVERIFY(box->text().contains(QStringLiteral("fileserver")));
+				for (QAbstractButton* b : box->buttons())
+				{
+					if (b->text().remove(QLatin1Char('&')).startsWith(buttonStart))
+					{
+						b->click();
+						return;
+					}
+				}
+				QFAIL(qPrintable(buttonStart));
+			});
+		};
+
+		answer(QStringLiteral("Skip"));
+		QCOMPARE(ui.networkPathWarning(path, ""), IDCANCEL);
+		QCOMPARE(nppParam.networkPathAlwaysAction(), NppParameters::networkPathAlwaysAsk);
+
+		answer(QStringLiteral("Always load from this server"));
+		QCOMPARE(ui.networkPathWarning(path, ""), IDYES);
+		QVERIFY(nppParam.isServerAllowed("\\\\fileserver\\share\\other.txt"));
+
+		answer(QStringLiteral("Always skip"));
+		QCOMPARE(ui.networkPathWarning(path, "title2"), IDNO);
+		QCOMPARE(nppParam.networkPathAlwaysAction(), NppParameters::networkPathAlwaysSkip);
+
+		answer(QStringLiteral("Always load network"));
+		QCOMPARE(ui.networkPathWarning(path, ""), IDRETRY);
+		QCOMPARE(nppParam.networkPathAlwaysAction(), NppParameters::networkPathAlwaysLoad);
+
+		nppParam.setNetworkPathAlwaysActionInServerWhitelist(NppParameters::networkPathAlwaysAsk);
 	}
 
 	void fullScreenPostItDistractionFree()
