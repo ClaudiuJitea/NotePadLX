@@ -1,6 +1,6 @@
 # NotePadLX Porting Status
 
-Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTREAM.md).
+Plan: [PROMPT.md](PROMPT.md). What is left: [NEXT_STEPS.md](NEXT_STEPS.md). Upstream versions and patches: [UPSTREAM.md](UPSTREAM.md).
 
 | Phase | Status |
 |---|---|
