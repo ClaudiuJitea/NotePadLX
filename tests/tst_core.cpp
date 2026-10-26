@@ -16,8 +16,10 @@
 // Phase 1 acceptance tests: the toolkit-free core (encodings, Utf8_16, Common, NppParameters).
 
 #include <QtTest>
+#include <QFile>
 #include <QTemporaryDir>
 
+#include <cerrno>
 #include <cstdlib>
 #include <fstream>
 #include <string>
@@ -417,6 +419,44 @@ private slots:
 		QCOMPARE(QString::fromStdWString(fileMenu), QStringLiteral("Nouveau"));
 		const std::wstring untitled = speaker.getLocalizedStrFromID("tab-untitled-string", L"new ");
 		QCOMPARE(QString::fromStdWString(untitled), QStringLiteral("nouveau "));
+	}
+
+	void fileAttributesWithTimeout()
+	{
+		// upstream getFileAttributesExWithTimeout: the result of the worker, no timeout on a local disk
+		QTemporaryDir dir;
+		QVERIFY(dir.isValid());
+		const std::wstring file = (dir.path() + "/a.txt").toStdWString();
+		{
+			QFile f(QString::fromStdWString(file));
+			QVERIFY(f.open(QIODevice::WriteOnly));
+			f.write("12345");
+		}
+		WIN32_FILE_ATTRIBUTE_DATA attr{};
+		bool isTimeoutReached = true;
+		DWORD error = 1;
+		QVERIFY(getFileAttributesExWithTimeout(file.c_str(), &attr, 0, &isTimeoutReached, &error));
+		QVERIFY(!isTimeoutReached);
+		QCOMPARE(error, DWORD(NO_ERROR));
+		QCOMPARE(attr.nFileSizeLow, DWORD(5));
+		QVERIFY(!(attr.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY));
+
+		const std::wstring missing = (dir.path() + "/missing").toStdWString();
+		QVERIFY(!getFileAttributesExWithTimeout(missing.c_str(), &attr, 0, &isTimeoutReached, &error));
+		QVERIFY(!isTimeoutReached);
+		QCOMPARE(error, DWORD(ENOENT));
+		QCOMPARE(attr.dwFileAttributes, DWORD(INVALID_FILE_ATTRIBUTES));
+
+		QVERIFY(doesFileExist(file.c_str()));
+		QVERIFY(!doesDirectoryExist(file.c_str()));
+		QVERIFY(doesDirectoryExist(dir.path().toStdWString().c_str()));
+		QVERIFY(doesPathExist(dir.path().toStdWString().c_str()));
+		QVERIFY(!doesPathExist(missing.c_str()));
+
+		ULARGE_INTEGER freeBytes{};
+		QVERIFY(getDiskFreeSpaceWithTimeout(dir.path().toStdWString().c_str(), &freeBytes, 0, &isTimeoutReached));
+		QVERIFY(!isTimeoutReached);
+		QVERIFY(freeBytes.QuadPart > 0);
 	}
 
 	void stringConversionStopsAtNull()

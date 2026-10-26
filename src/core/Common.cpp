@@ -18,14 +18,19 @@
 #include <cstring>
 #include "Common.h"
 
+#include <chrono>
 #include <cstdlib>
 #include <filesystem>
 #include <fnmatch.h>
+#include <future>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
+#include <system_error>
 #include <sys/stat.h>
 #include <sys/statfs.h>
 #include <sys/statvfs.h>
+#include <thread>
 #include <unistd.h>
 
 #include "Encoding.h"
@@ -1053,28 +1058,28 @@ bool Version::isCompatibleTo(const Version& from, const Version& to) const
 	return false;
 }
 
-bool doesFileExist(const wchar_t* filePath, DWORD, bool* isTimeoutReached)
+bool doesFileExist(const wchar_t* filePath, DWORD milliSec2wait, bool* isTimeoutReached)
 {
-	if (isTimeoutReached)
-		*isTimeoutReached = false;
-	struct stat st{};
-	return ::stat(nplx::toNativePath(filePath).c_str(), &st) == 0 && !S_ISDIR(st.st_mode);
+	WIN32_FILE_ATTRIBUTE_DATA attributes{};
+	attributes.dwFileAttributes = INVALID_FILE_ATTRIBUTES;
+	getFileAttributesExWithTimeout(filePath, &attributes, milliSec2wait, isTimeoutReached);
+	return (attributes.dwFileAttributes != INVALID_FILE_ATTRIBUTES && !(attributes.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-bool doesDirectoryExist(const wchar_t* dirPath, DWORD, bool* isTimeoutReached)
+bool doesDirectoryExist(const wchar_t* dirPath, DWORD milliSec2wait, bool* isTimeoutReached)
 {
-	if (isTimeoutReached)
-		*isTimeoutReached = false;
-	struct stat st{};
-	return ::stat(nplx::toNativePath(dirPath).c_str(), &st) == 0 && S_ISDIR(st.st_mode);
+	WIN32_FILE_ATTRIBUTE_DATA attributes{};
+	attributes.dwFileAttributes = INVALID_FILE_ATTRIBUTES;
+	getFileAttributesExWithTimeout(dirPath, &attributes, milliSec2wait, isTimeoutReached);
+	return (attributes.dwFileAttributes != INVALID_FILE_ATTRIBUTES && (attributes.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY));
 }
 
-bool doesPathExist(const wchar_t* path, DWORD, bool* isTimeoutReached)
+bool doesPathExist(const wchar_t* path, DWORD milliSec2wait, bool* isTimeoutReached)
 {
-	if (isTimeoutReached)
-		*isTimeoutReached = false;
-	struct stat st{};
-	return ::stat(nplx::toNativePath(path).c_str(), &st) == 0;
+	WIN32_FILE_ATTRIBUTE_DATA attributes{};
+	attributes.dwFileAttributes = INVALID_FILE_ATTRIBUTES;
+	getFileAttributesExWithTimeout(path, &attributes, milliSec2wait, isTimeoutReached);
+	return (attributes.dwFileAttributes != INVALID_FILE_ATTRIBUTES);
 }
 
 void expandEnv(wstring& path2Expand)
@@ -1338,27 +1343,81 @@ BOOL GetFileAttributesEx(const wchar_t* path, GET_FILEEX_INFO_LEVELS, WIN32_FILE
 	return TRUE;
 }
 
-BOOL getFileAttributesExWithTimeout(const wchar_t* filePath, WIN32_FILE_ATTRIBUTE_DATA* fileAttr, DWORD, bool* isTimeoutReached, DWORD* pdwWin32ApiError)
+static constexpr DWORD DEFAULT_MILLISEC = 3000;
+
+namespace
 {
-	// NPLX: upstream runs GetFileAttributesEx in a worker thread with a timeout to survive dead network
-	// drives. NPLX_TODO(Phase 3): same protection for hung NFS/SMB mounts.
-	if (isTimeoutReached)
-		*isTimeoutReached = false;
-	const BOOL ok = GetFileAttributesEx(filePath, GetFileExInfoStandard, fileAttr);
-	if (pdwWin32ApiError)
-		*pdwWin32ApiError = ok ? NO_ERROR : static_cast<DWORD>(errno);
-	return ok;
+	// NPLX: upstream runs the call in a worker thread and terminates it when the timeout has elapsed, to survive dead
+	// network drives. A thread cannot be terminated on Linux: the worker owns its data, and one blocked by a hung
+	// NFS / SMB / sshfs mount is left to finish on its own while the caller goes on.
+	template <class Result, class Work>
+	bool runWithTimeout(Work work, DWORD milliSec2wait, Result& result)
+	{
+		auto task = std::make_shared<std::packaged_task<Result()>>(std::move(work));
+		std::future<Result> done = task->get_future();
+		try
+		{
+			std::thread([task]() { (*task)(); }).detach();
+		}
+		catch (const std::system_error&)
+		{
+			return false; // upstream: CreateThread failed
+		}
+		if (done.wait_for(std::chrono::milliseconds(milliSec2wait == 0 ? DEFAULT_MILLISEC : milliSec2wait)) != std::future_status::ready)
+			return false;
+		result = done.get();
+		return true;
+	}
+
+	struct GetAttrExParamResult
+	{
+		WIN32_FILE_ATTRIBUTE_DATA _attributes{};
+		BOOL _result = FALSE;
+		DWORD _error = NO_ERROR;
+	};
 }
 
-BOOL getDiskFreeSpaceWithTimeout(const wchar_t* dirPath, ULARGE_INTEGER* freeBytesForUser, DWORD, bool* isTimeoutReached)
+BOOL getFileAttributesExWithTimeout(const wchar_t* filePath, WIN32_FILE_ATTRIBUTE_DATA* fileAttr,
+	DWORD milliSec2wait, bool* isTimeoutReached, DWORD* pdwWin32ApiError)
 {
-	if (isTimeoutReached)
-		*isTimeoutReached = false;
-	struct statvfs sv{};
-	if (!freeBytesForUser || ::statvfs(nplx::toNativePath(dirPath).c_str(), &sv) != 0)
+	GetAttrExParamResult data;
+	data._attributes.dwFileAttributes = INVALID_FILE_ATTRIBUTES;
+	const bool isDone = runWithTimeout([path = std::wstring(filePath ? filePath : L"")]() {
+		GetAttrExParamResult inAndOut;
+		inAndOut._attributes.dwFileAttributes = INVALID_FILE_ATTRIBUTES;
+		inAndOut._result = GetFileAttributesEx(path.c_str(), GetFileExInfoStandard, &inAndOut._attributes);
+		if (!inAndOut._result)
+			inAndOut._error = static_cast<DWORD>(errno);
+		return inAndOut;
+	}, milliSec2wait, data);
+
+	*fileAttr = data._attributes;
+
+	if (isTimeoutReached != nullptr)
+		*isTimeoutReached = !isDone;
+
+	if (pdwWin32ApiError != nullptr)
+		*pdwWin32ApiError = data._error;
+
+	return data._result;
+}
+
+BOOL getDiskFreeSpaceWithTimeout(const wchar_t* dirPath, ULARGE_INTEGER* freeBytesForUser, DWORD milliSec2wait, bool* isTimeoutReached)
+{
+	if (!freeBytesForUser)
 		return FALSE;
-	freeBytesForUser->QuadPart = static_cast<uint64_t>(sv.f_bavail) * sv.f_frsize; // space available to unprivileged users
-	return TRUE;
+	std::pair<BOOL, uint64_t> data{ FALSE, 0 };
+	const bool isDone = runWithTimeout([path = nplx::toNativePath(dirPath)]() {
+		struct statvfs sv{};
+		if (::statvfs(path.c_str(), &sv) != 0)
+			return std::pair<BOOL, uint64_t>{ FALSE, 0 };
+		return std::pair<BOOL, uint64_t>{ TRUE, static_cast<uint64_t>(sv.f_bavail) * sv.f_frsize }; // space available to unprivileged users
+	}, milliSec2wait, data);
+	if (isTimeoutReached)
+		*isTimeoutReached = !isDone;
+	if (data.first)
+		freeBytesForUser->QuadPart = data.second;
+	return data.first;
 }
 
 BOOL PathIsNetworkPath(const wchar_t* path)
