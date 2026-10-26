@@ -2256,7 +2256,13 @@ void Notepad_plus::onScintillaNotify(Scintilla::NotificationData* scnData)
 				// Buffer of the document being modified
 				Buffer* buffer = notifyView->getCurrentBuffer();
 
-				// NPLX_TODO(Phase 3): useFirstLineAsTabName (ndds._useContentAsTabName)
+				// Make temporary tab name automatically by using the 1st line of content for untitled documents
+				const NewDocDefaultSettings& ndds = NppParameters::getInstance().getNppGUI().getNewDocDefaultSettings();
+				intptr_t curLineIndex = notifyView->execute(SCI_LINEFROMPOSITION, notification->position);
+				if (curLineIndex == 0 && ndds._useContentAsTabName && buffer->isUntitled() && !buffer->isUntitledTabRenamed())
+				{
+					useFirstLineAsTabName(buffer);
+				}
 
 				// Hold the correct position for "Begin/End &Select" or "Begin/End Select in Column Mode" commands
 				notifyView->updateBeginEndSelectPosition(notification->modificationType & SC_MOD_INSERTTEXT, notification->position, notification->length);

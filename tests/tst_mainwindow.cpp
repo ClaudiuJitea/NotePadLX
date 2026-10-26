@@ -582,6 +582,38 @@ private slots:
 		nppGUI._definedSessionExt = sessionExt;
 	}
 
+	void firstLineAsTabName()
+	{
+		// upstream Preferences > New Document "Use the first line of content as tab name" (useFirstLineAsTabName)
+		NewDocDefaultSettings& ndds = NppParameters::getInstance().getNppGUI()._newDocDefaultSettings;
+		const bool useContent = ndds._useContentAsTabName;
+		ndds._useContentAsTabName = true;
+
+		_npp->command(IDM_FILE_NEW);
+		ScintillaEditView* view = currentView();
+		Buffer* buf = view->getCurrentBuffer();
+		QVERIFY(buf->isUntitled());
+		view->execute(SCI_ADDTEXT, 6, reinterpret_cast<LPARAM>("  Shop"));
+		view->execute(SCI_ADDTEXT, 11, reinterpret_cast<LPARAM>("ping list\nm"));
+		QCOMPARE(QString::fromStdWString(buf->getFileName()), QStringLiteral("Shopping list"));
+		QCOMPARE(tabOf(MAIN_VIEW)->tabText(tabOf(MAIN_VIEW)->currentIndex()), QStringLiteral("Shopping list"));
+		QVERIFY(buf->isUntitled());
+
+		// a second document with the same first line keeps its "new N" name
+		_npp->command(IDM_FILE_NEW);
+		Buffer* other = currentView()->getCurrentBuffer();
+		const QString otherName = QString::fromStdWString(other->getFileName());
+		currentView()->execute(SCI_ADDTEXT, 13, reinterpret_cast<LPARAM>("Shopping list"));
+		QCOMPARE(QString::fromStdWString(other->getFileName()), otherName);
+
+		// a tab renamed by the user keeps its name
+		other->setUntitledTabRenamedStatus(true);
+		currentView()->execute(SCI_SETTEXT, 0, reinterpret_cast<LPARAM>("Something else"));
+		QCOMPARE(QString::fromStdWString(other->getFileName()), otherName);
+
+		ndds._useContentAsTabName = useContent;
+	}
+
 	void rightButtonWheelSwitchesDocuments()
 	{
 		// upstream WM_MOUSEWHEEL with MK_RBUTTON: the previous / next document, and no context menu on the release

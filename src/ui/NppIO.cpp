@@ -1724,6 +1724,52 @@ void Notepad_plus::createMonitoringThread(Buffer* pBuf)
 	_monitors[pBuf] = watcher;
 }
 
+// Make a temporary tab name from first line of document
+bool Notepad_plus::useFirstLineAsTabName(BufferID bufferID)
+{
+	if (bufferID == BUFFER_INVALID)
+		return false;
+	Buffer* buffer = MainFileManager.getBufferByID(bufferID);
+
+	wstring content1stLineTabName = _pEditView->getLine(0);
+	buffer->normalizeTabName(content1stLineTabName);
+	if (content1stLineTabName.empty())
+		return false;
+
+	// check whether there is any buffer with the same name
+	BufferID sameNamedBufferId = _pDocTab->findBufferByName(content1stLineTabName.c_str());
+	if (sameNamedBufferId == BUFFER_INVALID)
+		sameNamedBufferId = _pNonDocTab->findBufferByName(content1stLineTabName.c_str());
+
+	if (content1stLineTabName != buffer->getFileName() && sameNamedBufferId == BUFFER_INVALID)
+	{
+		// NPLX_TODO(Phase 9): notify the plugins (NPPN_FILEBEFORERENAME, NPPN_FILERENAMED)
+
+		// backup old file path
+		wstring oldFileNamePath = buffer->getFullPathName();
+
+		// set tab name
+		buffer->setFileName(content1stLineTabName.c_str());
+
+		// for the backup system
+		wstring oldBackUpFileName = buffer->getBackupFileName();
+		bool isSnapshotMode = NppParameters::getInstance().getNppGUI().isSnapshotMode();
+		if (isSnapshotMode && !oldBackUpFileName.empty())
+		{
+			wstring newBackUpFileName = oldBackUpFileName;
+			newBackUpFileName.replace(newBackUpFileName.rfind(oldFileNamePath), oldFileNamePath.length(), content1stLineTabName);
+
+			nplx::moveFileReplace(oldBackUpFileName, newBackUpFileName); // NPLX: was ReplaceFile / MoveFileEx
+
+			buffer->setBackupFileName(newBackUpFileName);
+		}
+
+		return true;
+	}
+
+	return false;
+}
+
 int Notepad_plus::getHtmlXmlEncoding(const wchar_t* fileName) const
 {
 	// upstream Notepad_plus::getHtmlXmlEncoding. NPLX: the same POSIX expressions on the first block of the file with

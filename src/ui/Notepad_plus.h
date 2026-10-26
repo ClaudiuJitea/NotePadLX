@@ -200,6 +200,7 @@ public:
 	bool fileSaveAll();
 	bool fileSaveAs(BufferID id = BUFFER_INVALID, bool isSaveCopy = false);
 	bool fileRename(BufferID id = BUFFER_INVALID);
+	bool useFirstLineAsTabName(BufferID id);
 	bool fileDelete(BufferID id = BUFFER_INVALID);
 	void dropFiles(const QStringList& paths, int view = -1); // upstream dropFiles(HDROP)
 	void monitoringStartOrStopAndUpdateUI(Buffer* pBuf, bool isStarting);
