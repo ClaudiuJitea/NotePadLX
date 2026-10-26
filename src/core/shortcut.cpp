@@ -246,7 +246,10 @@ void getKeyStrFromVal(UCHAR keyVal, string & str)
 		// by default, assume it will just use the original name
 		str = namedKeyArray[i].name;
 		
-		// NPLX_TODO(Phase 7): upstream maps OEM keys to the active keyboard layout's names (mapOemVirtualKeys)
+		// NPLX: upstream mapOemVirtualKeys renames the OEM keys after the character of the same physical key on the
+		// active layout, because Windows matches shortcuts by key position. Qt matches them by the character typed
+		// (ui/KeyMap.cpp: VK_OEM_1 is Qt::Key_Semicolon on any layout), so the names above already say which key
+		// triggers the shortcut, whatever the layout.
 	}
 	else 
 		str = "Unlisted";
