@@ -151,6 +151,10 @@ add_library(nplx_ui STATIC
     ui/columnEditor.h
     ui/columnEditor_rc.h
     ui/RcColumnEditor.inc
+    ui/FindCharsInRange.cpp
+    ui/FindCharsInRange.h
+    ui/findCharsInRange_rc.h
+    ui/RcFindCharsInRange.inc
     ui/md5Dlgs.h
     ui/md5Dlgs_rc.h
     ui/RcHashDialogs.inc

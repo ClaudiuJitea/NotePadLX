@@ -275,6 +275,48 @@ void Notepad_plus::loadLocalizationsAndThemes()
 	// NPLX_TODO(Phase 8): follow the desktop dark mode (NppDarkMode::isWindowsModeEnabled) with its theme
 }
 
+std::vector<std::wstring> Notepad_plus::addNppComponents(const wchar_t *destDir, const wchar_t *extFilterName, const wchar_t *extFilter)
+{
+	// NPLX: QFileDialog (through UiServices) in place of CustomFileDialog
+	std::wstring filter = extFilterName;
+	filter += L" (*";
+	filter += extFilter;
+	filter += L")";
+	const std::vector<std::wstring> fns = nplx::uiServices()
+		? nplx::uiServices()->getOpenFileNames(L"Open", filter, L"") : std::vector<std::wstring>();
+
+	std::vector<std::wstring> copiedFiles;
+
+	if (!fns.empty())
+	{
+		// NPLX: the user data dir (getUserPath, as the themes found at start-up), not the install dir: on Linux
+		// getNppPath() is /usr/share/notepadlx, which the user cannot write
+		std::wstring destDirName = (NppParameters::getInstance()).getUserPath();
+		pathAppend(destDirName, destDir);
+
+		if (!doesDirectoryExist(destDirName.c_str()))
+		{
+			nplx::createDirectories(destDirName); // NPLX: was ::CreateDirectory
+		}
+
+		destDirName += L"/";
+
+		size_t sz = fns.size();
+		for (size_t i = 0 ; i < sz ; ++i)
+		{
+			if (doesFileExist(fns.at(i).c_str()))
+			{
+				// copy to plugins directory
+				std::wstring destName = destDirName;
+				destName += ::PathFindFileName(fns.at(i).c_str());
+				if (nplx::copyFile(fns.at(i), destName, false)) // NPLX: was ::CopyFile
+					copiedFiles.push_back(destName.c_str());
+			}
+		}
+	}
+	return copiedFiles;
+}
+
 void Notepad_plus::init()
 {
 	NppParameters& nppParam = NppParameters::getInstance();

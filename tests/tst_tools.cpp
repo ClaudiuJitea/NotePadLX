@@ -38,10 +38,13 @@
 #include "ScintillaEditView.h"
 #include "localization.h"
 #include "AboutDlg.h"
+#include "WordStyleDlg.h"
 #include "columnEditor.h"
 #include "md5Dlgs.h"
 #include "md5Dlgs_rc.h"
 #include "columnEditor_rc.h"
+#include "FindCharsInRange.h"
+#include "findCharsInRange_rc.h"
 #include "menuCmdID.h"
 #include "resource.h"
 
@@ -61,6 +64,21 @@ namespace
 		int saveOrNotMultiBox(const std::wstring&, const std::wstring&) override { return IDNO; }
 		std::vector<std::wstring> getOpenFileNames(const std::wstring&, const std::wstring&, const std::wstring&) override { return _filesAnswer; }
 		std::vector<std::wstring> _filesAnswer;
+		std::wstring getOpenFileName(const std::wstring&, const std::wstring&, const std::wstring&) override { return _fileAnswer; }
+		std::wstring getSaveFileNameEx(const std::wstring&, const std::wstring& filter, const std::wstring&,
+			const std::wstring& defExt, const std::wstring& checkboxLabel, bool* checkboxState) override
+		{
+			_lastFilter = filter;
+			_lastDefExt = defExt;
+			_lastCheckboxLabel = checkboxLabel;
+			if (checkboxState)
+				*checkboxState = false;
+			return _fileAnswer;
+		}
+		std::wstring _fileAnswer;
+		std::wstring _lastFilter;
+		std::wstring _lastDefExt;
+		std::wstring _lastCheckboxLabel;
 	};
 
 	QString reference(QCryptographicHash::Algorithm algo, const QByteArray& data)
@@ -332,6 +350,161 @@ private slots:
 		QCOMPARE(p._repeatNum, 2);
 	}
 
+	void findCharsInRange()
+	{
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_SEARCH_FINDCHARINRANGE));
+		_npp->command(IDM_FILE_NEW);
+		// "é" is 2 bytes in UTF-8 (0xC3 0xA9), "\x01" is ASCII
+		view()->execute(SCI_SETTEXT, 0, reinterpret_cast<sptr_t>("ab\xC3\xA9" "cd\x01" "e"));
+		view()->execute(SCI_GOTOPOS, 0);
+
+		_npp->command(IDM_SEARCH_FINDCHARINRANGE);
+		FindCharsInRangeDlg* dlg = _npp->getFindCharsInRangeDlg();
+		QVERIFY(dlg && dlg->isVisible());
+		// upstream defaults: non-ASCII, down, the custom range disabled
+		QVERIFY(dlg->isCheckedOrNot(IDC_NONASCCI_RADIO));
+		QVERIFY(dlg->isCheckedOrNot(ID_FINDCHAR_DIRDOWN));
+		QVERIFY(!dlg->dlgItem(IDC_RANGESTART_EDIT)->isEnabled());
+		screenshot(dlg, "find-chars-in-range.png");
+
+		auto sel = [this]() { return std::make_pair(view()->execute(SCI_GETSELECTIONSTART), view()->execute(SCI_GETSELECTIONEND)); };
+
+		// non-ASCII: each byte of "é" in turn (one byte is selected, as upstream)
+		dlg->command(ID_FINDCHAR_NEXT);
+		QCOMPARE(sel(), std::make_pair(sptr_t(2), sptr_t(3)));
+		dlg->command(ID_FINDCHAR_NEXT);
+		QCOMPARE(sel(), std::make_pair(sptr_t(3), sptr_t(4)));
+		// no wrap: nothing more after the caret
+		dlg->setChecked(ID_FINDCHAR_WRAP, false);
+		dlg->command(ID_FINDCHAR_NEXT);
+		QCOMPARE(sel(), std::make_pair(sptr_t(3), sptr_t(4)));
+		// wrap: back to the first one
+		dlg->setChecked(ID_FINDCHAR_WRAP, true);
+		dlg->command(ID_FINDCHAR_NEXT);
+		QCOMPARE(sel(), std::make_pair(sptr_t(2), sptr_t(3)));
+
+		// custom range 0-31, up with wrap from position 0: the control character at 6
+		dlg->setChecked(IDC_MYRANGE_RADIO, true);
+		dlg->command(IDC_MYRANGE_RADIO);
+		QVERIFY(dlg->dlgItem(IDC_RANGESTART_EDIT)->isEnabled());
+		dlg->setItemText(IDC_RANGEEND_EDIT, L"31");
+		dlg->setChecked(ID_FINDCHAR_DIRUP, true);
+		view()->execute(SCI_GOTOPOS, 0);
+		dlg->command(ID_FINDCHAR_NEXT);
+		QCOMPARE(view()->execute(SCI_GETCURRENTPOS), sptr_t(6));
+		QCOMPARE(view()->execute(SCI_GETANCHOR), sptr_t(7));
+
+		// an invalid range is reported and the selection is kept
+		const int nb = _ui._nbMessages;
+		dlg->setItemText(IDC_RANGESTART_EDIT, L"200");
+		dlg->setItemText(IDC_RANGEEND_EDIT, L"100");
+		dlg->command(ID_FINDCHAR_NEXT);
+		QCOMPARE(_ui._nbMessages, nb + 1);
+		QCOMPARE(_ui._lastMessage, std::wstring(L"You should type between 0 and 255."));
+		QCOMPARE(view()->execute(SCI_GETCURRENTPOS), sptr_t(6));
+
+		dlg->command(IDCANCEL);
+		QVERIFY(!dlg->isVisible());
+	}
+
+	void importStyleThemes()
+	{
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_SETTING_IMPORTSTYLETHEMES));
+		ThemeSwitcher& themeSwitcher = NppParameters::getInstance().getThemeSwitcher();
+		const size_t nbThemes = themeSwitcher.size();
+
+		// the theme name comes from the file name
+		const QString src = _tmp.path() + "/My Imported Theme.xml";
+		QVERIFY(QFile::copy(QStringLiteral(NPLX_TEST_SOURCE_DATA_DIR) + "/themes/Zenburn.xml", src));
+
+		_npp->command(IDM_LANGSTYLE_CONFIG_DLG); // the Style Configurator lists it when it is already created
+		WordStyleDlg* styleDlg = _npp->getConfigStyleDlg();
+		QVERIFY(styleDlg->isCreated());
+		QComboBox* themeCombo = nullptr; // "Select theme"
+		for (QComboBox* combo : styleDlg->findChildren<QComboBox*>())
+			if (combo->findText(QStringLiteral("Zenburn")) >= 0)
+				themeCombo = combo;
+		QVERIFY(themeCombo);
+		const int nbComboItems = themeCombo->count();
+
+		_ui._filesAnswer = { src.toStdWString() };
+		_npp->command(IDM_SETTING_IMPORTSTYLETHEMES);
+		_ui._filesAnswer.clear();
+
+		// copied into the user's themes folder (scanned at start-up) and added once
+		const QString dest = QString::fromStdWString(NppParameters::getInstance().getUserPath()) + "/themes/My Imported Theme.xml";
+		QVERIFY(QFile::exists(dest));
+		QCOMPARE(themeSwitcher.size(), nbThemes + 1);
+		QVERIFY(themeSwitcher.themeNameExists(L"My Imported Theme"));
+		QCOMPARE(themeSwitcher.getElementFromIndex(themeSwitcher.size() - 1).second, dest.toStdWString());
+		QCOMPARE(themeCombo->count(), nbComboItems + 1);
+		QCOMPARE(themeCombo->itemText(nbComboItems), QStringLiteral("My Imported Theme"));
+
+		// importing it again overwrites the file and does not add a second entry
+		_ui._filesAnswer = { src.toStdWString() };
+		_npp->command(IDM_SETTING_IMPORTSTYLETHEMES);
+		_ui._filesAnswer.clear();
+		QCOMPARE(themeSwitcher.size(), nbThemes + 1);
+		styleDlg->hide();
+	}
+
+	void saveAndLoadSession()
+	{
+		// File > Save Session... then Load Session... (upstream fileSaveSession / fileLoadSession)
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_FILE_SAVESESSION));
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_FILE_LOADSESSION));
+		const QString a = _tmp.filePath(QStringLiteral("session-a.txt"));
+		const QString b = _tmp.filePath(QStringLiteral("session-b.txt"));
+		for (const QString& fn : { a, b })
+		{
+			QFile f(fn);
+			QVERIFY(f.open(QIODevice::WriteOnly));
+			f.write("text\n");
+		}
+		const BufferID idA = _npp->doOpen(a.toStdWString());
+		const BufferID idB = _npp->doOpen(b.toStdWString());
+		QVERIFY(idA != BUFFER_INVALID && idB != BUFFER_INVALID);
+
+		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+		nppGUI._definedSessionExt = L"npp-session";
+		const QString sessionFile = _tmp.filePath(QStringLiteral("work.npp-session"));
+		_ui._fileAnswer = sessionFile.toStdWString();
+		_npp->command(IDM_FILE_SAVESESSION);
+		// the session extension is the default one and the first filter
+		QCOMPARE(_ui._lastDefExt, std::wstring(L"npp-session"));
+		QVERIFY(_ui._lastFilter.rfind(L"Session file (*.npp-session)", 0) == 0);
+		QVERIFY(QFile::exists(sessionFile));
+		QFile saved(sessionFile);
+		QVERIFY(saved.open(QIODevice::ReadOnly));
+		const QByteArray xml = saved.readAll();
+		QVERIFY(xml.contains("session-a.txt"));
+		QVERIFY(xml.contains("session-b.txt"));
+
+		_npp->fileCloseAll(false);
+		QCOMPARE(MainFileManager.getBufferFromName(a.toStdWString().c_str()), BUFFER_INVALID);
+
+		_npp->command(IDM_FILE_LOADSESSION);
+		_ui._fileAnswer.clear();
+		QVERIFY(MainFileManager.getBufferFromName(a.toStdWString().c_str()) != BUFFER_INVALID);
+		QVERIFY(MainFileManager.getBufferFromName(b.toStdWString().c_str()) != BUFFER_INVALID);
+		nppGUI._definedSessionExt.clear();
+		_npp->fileCloseAll(false);
+	}
+
+	void editPopupContextMenu()
+	{
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_SETTING_EDITCONTEXTMENU));
+		const int nb = _ui._nbMessages;
+		_npp->command(IDM_SETTING_EDITCONTEXTMENU);
+		// the restart warning, then contextMenu.xml of the user's settings is the current document
+		QCOMPARE(_ui._nbMessages, nb + 1);
+		QVERIFY(_ui._lastMessage.find(L"contextMenu.xml") != std::wstring::npos);
+		const std::wstring& path = NppParameters::getInstance().getContextMenuPath();
+		QCOMPARE(std::wstring(_npp->getCurrentBuffer()->getFullPathName()), path);
+		QVERIFY(text().contains(QStringLiteral("<ScintillaContextMenu>")));
+		_npp->command(IDM_FILE_CLOSE);
+	}
+
 	void aboutBoxShowsAllItsText()
 	{
 		_npp->command(IDM_ABOUT);
@@ -385,7 +558,7 @@ private slots:
 		auto latest = [this](const char* tag) {
 			const QString path = _tmp.path() + "/latest.json";
 			QFile f(path);
-			f.open(QIODevice::WriteOnly);
+			QVERIFY(f.open(QIODevice::WriteOnly));
 			f.write(QByteArray("{\"tag_name\": \"") + tag + "\", \"html_url\": \"https://github.com/ClaudiuJitea/NotePadLX/releases/tag/" + tag + "\"}");
 			f.close();
 			::setenv("NPLX_UPDATE_URL", QUrl::fromLocalFile(path).toString().toUtf8().constData(), 1);

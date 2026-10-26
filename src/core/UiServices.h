@@ -53,6 +53,16 @@ namespace nplx
 		virtual std::wstring getOpenFileName(const std::wstring& title, const std::wstring& filter, const std::wstring& dir) { (void)title; (void)filter; (void)dir; return std::wstring(); }
 		virtual std::vector<std::wstring> getOpenFileNames(const std::wstring& title, const std::wstring& filter, const std::wstring& dir) { (void)title; (void)filter; (void)dir; return {}; }
 		virtual std::wstring getSaveFileName(const std::wstring& title, const std::wstring& filter, const std::wstring& dir) { (void)title; (void)filter; (void)dir; return std::wstring(); }
+		// doSaveDlg with setDefExt (defExt, without the dot; may be empty) and setCheckbox (an empty checkboxLabel: no
+		// checkbox; *checkboxState is the box's state on return, getCheckboxState)
+		virtual std::wstring getSaveFileNameEx(const std::wstring& title, const std::wstring& filter, const std::wstring& dir,
+			const std::wstring& defExt, const std::wstring& checkboxLabel, bool* checkboxState)
+		{
+			(void)defExt;
+			if (checkboxState) *checkboxState = false;
+			(void)checkboxLabel;
+			return getSaveFileName(title, filter, dir);
+		}
 
 		// A one-line text input (e.g. upstream FileRelocalizerDlg); false when cancelled
 		virtual bool getText(const std::wstring& title, const std::wstring& label, std::wstring& text) { (void)title; (void)label; (void)text; return false; }

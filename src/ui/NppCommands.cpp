@@ -27,6 +27,7 @@
 #include "AboutDlg.h"
 #include "ShortcutMapper.h"
 #include "columnEditor.h"
+#include "FindCharsInRange.h"
 #include "md5Dlgs.h"
 #include "VerticalFileSwitcher.h"
 
@@ -1958,6 +1959,55 @@ void Notepad_plus::command(int id)
 		break;
 
 
+		case IDM_FILE_LOADSESSION:
+			fileLoadSession();
+			break;
+
+		case IDM_FILE_SAVESESSION:
+			fileSaveSession();
+			break;
+
+		case IDM_SETTING_EDITCONTEXTMENU :
+		{
+			// NPLX: "NotePadLX" in place of "Notepad++" in the default text
+			_nativeLangSpeaker.messageBox("ContextMenuXmlEditWarning",
+				L"Editing contextMenu.xml allows you to modify your NotePadLX popup context menu on edit zone.\rYou have to restart your NotePadLX to take effect after modifying contextMenu.xml.",
+				L"Editing contextMenu",
+				MB_OK|MB_APPLMODAL);
+
+			const NppParameters& nppParams = NppParameters::getInstance();
+			BufferID bufID = doOpen((nppParams.getContextMenuPath()));
+			switchToFile(bufID);
+			break;
+		}
+
+		case IDM_SETTING_IMPORTSTYLETHEMES :
+		{
+			// get plugin source path
+			const wchar_t *extFilterName = L"Notepad++ style theme";
+			const wchar_t *extFilter = L".xml";
+			const wchar_t *destDir = L"themes";
+
+			// load styler
+			NppParameters& nppParams = NppParameters::getInstance();
+			ThemeSwitcher & themeSwitcher = nppParams.getThemeSwitcher();
+
+			std::vector<std::wstring> copiedFiles = addNppComponents(destDir, extFilterName, extFilter);
+			for (size_t i = 0, len = copiedFiles.size(); i < len ; ++i)
+			{
+				std::wstring themeName(themeSwitcher.getThemeFromXmlFileName(copiedFiles[i].c_str()));
+				if (!themeSwitcher.themeNameExists(themeName.c_str()))
+				{
+					themeSwitcher.addThemeFromXml(copiedFiles[i].c_str());
+					if (_configStyleDlg->isCreated())
+					{
+						_configStyleDlg->addLastThemeEntry();
+					}
+				}
+			}
+			break;
+		}
+
 		case IDM_LANGSTYLE_CONFIG_DLG :
 		{
 			if (!(NppParameters::getInstance()).isStylerDocLoaded())
@@ -2152,6 +2202,19 @@ void Notepad_plus::command(int id)
 		}
 		break;
 
+
+		case IDM_SEARCH_FINDCHARINRANGE :
+		{
+			if (!_findCharsInRangeDlg)
+			{
+				// upstream Notepad_plus::init: _findCharsInRangeDlg.init(_pPublicInterface->getHinst(), hwnd, &_pEditView)
+				_findCharsInRangeDlg = new FindCharsInRangeDlg(this);
+				_findCharsInRangeDlg->init(&_pEditView);
+			}
+			_findCharsInRangeDlg->doDialog();
+			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeDlgLang(_findCharsInRangeDlg.getHSelf(), "FindCharsInRange") on first use
+		}
+		break;
 
 		case IDM_SEARCH_GOTOLINE:
 		{

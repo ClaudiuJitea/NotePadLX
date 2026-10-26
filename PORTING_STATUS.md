@@ -11,12 +11,35 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 4. Find / Replace | 🚧 Mostly done (dialog, Finder, Find in Files, Mark, smart highlight; incremental search open) |
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
-| 7. Dialogs and tools | 🚧 Mostly done: macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages); Edit Popup ContextMenu, style theme import, Find characters in range next |
+| 7. Dialogs and tools | ✅ Done (2026‑10‑25): macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages), Find characters in range, Edit Popup ContextMenu, style theme import |
 | 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates; printing and localization next |
 | 9. Plugin API for Linux | ⏳ Planned |
 | 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.6); Flatpak, `.rpm` and CI next |
 
 **Current version: 0.6** (2026‑10‑25): sessions 10–14 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 15 (2026‑10‑25): Phase 7 done — Find characters in range, Edit Popup ContextMenu, theme import, sessions
+
+- **Search › Find characters in range…** (`ui/FindCharsInRange.*`, port of upstream
+  `WinControls/FindCharsInRange`, built from IDD_FINDCHARACTERS by RcDialog, `ui/RcFindCharsInRange.inc`): non-ASCII
+  (128–255), ASCII (0–127) or a custom byte range, up / down, wrap around. As upstream, it searches the document's
+  bytes and selects one byte (a UTF-8 "é" is found as two bytes). Modeless; the invalid range message is kept. NPLX:
+  `std::vector` in place of `new char[]`.
+- **Settings › Edit Popup ContextMenu:** the upstream warning (restart needed), then opens the user's
+  `contextMenu.xml`. The default text says NotePadLX in place of Notepad++.
+- **Settings › Import › Import style theme(s)…:** upstream `addNppComponents` + the theme registration. NPLX: the
+  files are copied into the user's `themes` folder (`getUserPath()/themes`, which is scanned at start-up), not the
+  install dir (`/usr/share/notepadlx` is read-only). A new theme is added to the theme list and to an open Style
+  Configurator; importing the same file again overwrites it and does not add a second entry.
+- **File › Load Session… / Save Session…** (upstream `fileLoadSession` / `fileSaveSession`): the session extension of
+  Preferences › MISC is the default extension and the first filter; the "Save Folder as Workspace" check box of the
+  save dialog (shown when Folder as Workspace is open; it needs the Qt file dialog, a portal dialog cannot take one)
+  also saves the workspace roots and expanded folders. With the multi-instance settings, a session opens in a new
+  `-multiInst -nosession -openSession` instance unless the window is empty, as upstream.
+- **Tests:** `tst_tools` `findCharsInRange`, `importStyleThemes`, `editPopupContextMenu`, `saveAndLoadSession`
+  (4 new cases); fixed the unchecked `QFile::open` warning in `checkForUpdates`. 17/17 suites pass.
+- **Next:** the Phase 3/4 leftovers (Incremental Search, tab colours), then Phase 8 (printing, runtime localization of
+  the dialogs, tray icon, Move / Open in New Instance).
 
 ## Session 14 (2026‑10‑25): version 0.6 — the Find dialog layout, Settings › Preferences
 
@@ -199,8 +222,7 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 3/4 leftovers | File › Load Session…, Save Session…; Search › Incremental Search (Ctrl+Alt+I); View › Tab › Apply Color 1–5, Remove Color |
-| 7 | Settings › Edit Popup ContextMenu, Import › Import style theme(s)…; Search › Find characters in range… |
+| 3/4 leftovers | Search › Incremental Search (Ctrl+Alt+I); View › Tab › Apply Color 1–5, Remove Color |
 | 8 | File › Print… (Ctrl+P), Print Now; View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |

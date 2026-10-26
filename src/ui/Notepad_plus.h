@@ -70,6 +70,7 @@ class RunDlg;
 class RunMacroDlg;
 class HashFromFilesDlg;
 class ColumnEditorDlg;
+class FindCharsInRangeDlg;
 class AboutDlg;
 class DebugInfoDlg;
 class CmdLineArgsDlg;
@@ -153,6 +154,7 @@ public:
 	// Upstream Notepad_plus::init (edit views, doc tabs, menus, status bar)
 	void init();
 	void loadLocalizationsAndThemes(); // upstream Notepad_plus_Window::init
+	std::vector<std::wstring> addNppComponents(const wchar_t *destDir, const wchar_t *extFilterName, const wchar_t *extFilter);
 
 	// --- NppBufferHost (called by FileManager / Buffer)
 	Buffer* getCurrentBuffer() override;
@@ -183,6 +185,9 @@ public:
 	bool doReload(BufferID id, bool alert = true);
 	void fileNew();
 	void fileOpen();
+	bool fileLoadSession(const wchar_t* fn = nullptr);
+	const wchar_t* fileSaveSession(size_t nbFile, wchar_t** fileNames, const wchar_t* sessionFile2save, bool includeFileBrowser = false);
+	const wchar_t* fileSaveSession(size_t nbFile = 0, wchar_t** fileNames = nullptr);
 	bool fileReload();
 	bool fileClose(BufferID id = BUFFER_INVALID, int curView = -1);
 	bool fileCloseAll(bool doDeleteBackup, bool isSnapshotMode = false);
@@ -313,6 +318,7 @@ public:
 	RunDlg* getRunDlg() const { return _runDlg; } // NPLX: tests
 	RunMacroDlg* getRunMacroDlg() const { return _runMacroDlg; } // NPLX: tests
 	ColumnEditorDlg* getColumnEditorDlg() const { return _colEditorDlg; } // NPLX: tests
+	FindCharsInRangeDlg* getFindCharsInRangeDlg() const { return _findCharsInRangeDlg; } // NPLX: tests
 	AboutDlg* getAboutDlg() const { return _aboutDlg; } // NPLX: tests
 	DebugInfoDlg* getDebugInfoDlg() const { return _debugInfoDlg; } // NPLX: tests
 	CmdLineArgsDlg* getCmdLineArgsDlg() const { return _cmdLineArgsDlg; } // NPLX: tests
@@ -475,6 +481,7 @@ private:
 	class ShortcutMapper* _pShortcutMapper = nullptr; // upstream: the open Shortcut Mapper (NPPM_INTERNAL_FINDKEYCONFLICTS)
 	// upstream _md5FromFilesDlg, _md5FromTextDlg, _sha1From..., _sha2From..., _sha512From... (created on first use)
 	ColumnEditorDlg* _colEditorDlg = nullptr; // upstream _colEditorDlg (created on first use)
+	FindCharsInRangeDlg* _findCharsInRangeDlg = nullptr; // upstream _findCharsInRangeDlg (created on first use)
 	AboutDlg* _aboutDlg = nullptr;
 	DebugInfoDlg* _debugInfoDlg = nullptr;
 	CmdLineArgsDlg* _cmdLineArgsDlg = nullptr;

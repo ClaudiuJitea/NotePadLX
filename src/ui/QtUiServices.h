@@ -28,6 +28,8 @@ public:
 	std::wstring getOpenFileName(const std::wstring& title, const std::wstring& filter, const std::wstring& dir) override;
 	std::vector<std::wstring> getOpenFileNames(const std::wstring& title, const std::wstring& filter, const std::wstring& dir) override;
 	std::wstring getSaveFileName(const std::wstring& title, const std::wstring& filter, const std::wstring& dir) override;
+	std::wstring getSaveFileNameEx(const std::wstring& title, const std::wstring& filter, const std::wstring& dir,
+		const std::wstring& defExt, const std::wstring& checkboxLabel, bool* checkboxState) override;
 	bool getText(const std::wstring& title, const std::wstring& label, std::wstring& text) override;
 	int networkPathWarning(const std::wstring& path, const std::string& titleTag) override;
 	SIZE primaryScreenSize() override;

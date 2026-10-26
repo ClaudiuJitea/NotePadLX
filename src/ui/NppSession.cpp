@@ -23,11 +23,17 @@
 #include "VerticalFileSwitcher.h"
 #include "FileBrowser.h"
 
+#include <cwchar>
+
 #include <QAction>
+#include <QCoreApplication>
+#include <QProcess>
+#include <QStringList>
 
 #include "DocTabView.h"
 #include "Parameters.h"
 #include "ScintillaEditView.h"
+#include "UiServices.h"
 #include "menuCmdID.h"
 
 using std::wstring;
@@ -120,6 +126,156 @@ void Notepad_plus::loadLastSession()
 	_isFolding = true;
 	loadSession(lastSession, isSnapshotMode);
 	_isFolding = false;
+}
+
+bool Notepad_plus::fileLoadSession(const wchar_t *fn)
+{
+	bool result = false;
+	wstring sessionFileName;
+	if (fn == NULL)
+	{
+		// NPLX: QFileDialog (through UiServices) in place of CustomFileDialog
+		std::wstring filters;
+		const wchar_t *ext = NppParameters::getInstance().getNppGUI()._definedSessionExt.c_str();
+		if (*ext != '\0')
+		{
+			wstring sessionExt = L"";
+			if (*ext != '.')
+				sessionExt += L".";
+			sessionExt += ext;
+			filters = L"Session file (*" + sessionExt + L");;";
+		}
+		filters += L"All types (*)";
+		wstring localizedTitle = _nativeLangSpeaker.getNativeLangMenuString(IDM_FILE_LOADSESSION, L"Load Session", true);
+		if (nplx::uiServices())
+			sessionFileName = nplx::uiServices()->getOpenFileName(localizedTitle, filters, fileDialogDir().toStdWString());
+		rememberFileDialogDir(QString::fromStdWString(sessionFileName));
+	}
+	else
+	{
+		if (doesFileExist(fn))
+			sessionFileName = fn;
+	}
+
+	NppParameters& nppParam = NppParameters::getInstance();
+	const NppGUI & nppGUI = nppParam.getNppGUI();
+	if (!sessionFileName.empty())
+	{
+		bool isEmptyNpp = false;
+		if (_mainDocTab->nbItem() == 1 && _subDocTab->nbItem() == 1)
+		{
+			Buffer * buf1 = MainFileManager.getBufferByID(_mainDocTab->getBufferByIndex(0));
+			Buffer * buf2 = MainFileManager.getBufferByID(_subDocTab->getBufferByIndex(0));
+			isEmptyNpp = (!buf1->isDirty() && buf1->isUntitled() && !buf2->isDirty() && buf2->isUntitled());
+		}
+		if (!isEmptyNpp && (nppGUI._multiInstSetting == multiInstOnSession || nppGUI._multiInstSetting == multiInst))
+		{
+			// NPLX: QProcess::startDetached in place of GetModuleFileName + ShellExecute
+			const QStringList args = { QStringLiteral("-multiInst"), QStringLiteral("-nosession"), QStringLiteral("-openSession"),
+				QString::fromStdWString(sessionFileName) };
+			if (QProcess::startDetached(QCoreApplication::applicationFilePath(), args, QStringLiteral(".")))
+				result = true;
+		}
+		else
+		{
+			Session session2Load;
+
+			if (nppParam.loadSession(session2Load, sessionFileName.c_str()))
+			{
+				const bool isSnapshotMode = false;
+				result = loadSession(session2Load, isSnapshotMode, sessionFileName.c_str());
+
+				if (isEmptyNpp && nppGUI._multiInstSetting == multiInstOnSession)
+					nppParam.setLoadedSessionFilePath(sessionFileName);
+			}
+		}
+	}
+
+	return result;
+}
+
+const wchar_t * Notepad_plus::fileSaveSession(size_t nbFile, wchar_t ** fileNames, const wchar_t *sessionFile2save, bool includeFileBrowser)
+{
+	if (sessionFile2save && (wcslen(sessionFile2save) > 0))
+	{
+		Session currentSession;
+		if ((nbFile) && (fileNames))
+		{
+			for (size_t i = 0 ; i < nbFile ; ++i)
+			{
+				if (doesFileExist(fileNames[i]))
+					currentSession._mainViewFiles.push_back(sessionFileInfo(fileNames[i]));
+			}
+		}
+		else
+			getCurrentOpenedFiles(currentSession);
+
+		currentSession._includeFileBrowser = includeFileBrowser;
+		if (includeFileBrowser && _pFileBrowser && !_pFileBrowser->isClosed())
+		{
+			currentSession._fileBrowserSelectedItem = _pFileBrowser->getSelectedItemPath();
+
+			std::vector<std::wstring> expandedPaths = _pFileBrowser->getExpandedPathsFromFaW();
+			std::vector<std::wstring> roots = _pFileBrowser->getRoots();
+			for (auto& rootFileName : roots)
+			{
+				FileBrowserRootsInfo rootInfo(rootFileName);
+
+				for (const auto& i : expandedPaths)
+				{
+					// NPLX: case-sensitive, as Linux paths (upstream compares lower-cased paths)
+					if (i.rfind(rootFileName, 0) == 0)
+					{
+						rootInfo._expandedPaths.insert(i);
+					}
+				}
+				currentSession._fileBrowserRoots.push_back(rootInfo);
+			}
+		}
+
+		(NppParameters::getInstance()).writeSession(currentSession, sessionFile2save);
+		return sessionFile2save;
+	}
+	return NULL;
+}
+
+const wchar_t * Notepad_plus::fileSaveSession(size_t nbFile, wchar_t ** fileNames)
+{
+	// NPLX: QFileDialog (through UiServices::getSaveFileNameEx) in place of CustomFileDialog
+	std::wstring filters;
+	std::wstring defExt;
+	const wchar_t *ext = NppParameters::getInstance().getNppGUI()._definedSessionExt.c_str();
+
+	if (*ext != '\0')
+	{
+		wstring sessionExt = L"";
+		if (*ext != '.')
+			sessionExt += L".";
+		sessionExt += ext;
+		filters = L"Session file (*" + sessionExt + L");;"; // the first filter, as setExtIndex(0)
+		defExt = sessionExt.substr(1);
+	}
+	filters += L"All types (*)";
+	const bool isCheckboxActive = _pFileBrowser && !_pFileBrowser->isClosed();
+	const wstring checkboxLabel = _nativeLangSpeaker.getLocalizedStrFromID("session-save-folder-as-workspace", L"Save Folder as Workspace");
+	wstring localizedTitle = _nativeLangSpeaker.getNativeLangMenuString(IDM_FILE_SAVESESSION, L"Save Session", true);
+	bool checkboxState = false;
+	// NPLX: upstream shows the checkbox disabled when Folder as Workspace is closed; here it is not shown then
+	wstring sessionFileName = nplx::uiServices()
+		? nplx::uiServices()->getSaveFileNameEx(localizedTitle, filters, fileDialogDir().toStdWString(), defExt,
+			isCheckboxActive ? checkboxLabel : std::wstring(), &checkboxState)
+		: std::wstring();
+
+	if (!sessionFileName.empty())
+	{
+		rememberFileDialogDir(QString::fromStdWString(sessionFileName));
+		// NPLX: the returned pointer must outlive this call (upstream returned the dialog's static buffer)
+		static std::wstring savedSessionFileName;
+		savedSessionFileName = sessionFileName;
+		return fileSaveSession(nbFile, fileNames, savedSessionFileName.c_str(), checkboxState);
+	}
+
+	return NULL;
 }
 
 void Notepad_plus::saveSession(const Session& session)

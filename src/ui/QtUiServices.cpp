@@ -17,7 +17,9 @@
 
 #include <QApplication>
 #include <QGuiApplication>
+#include <QCheckBox>
 #include <QFileDialog>
+#include <QGridLayout>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMessageBox>
@@ -124,6 +126,36 @@ std::vector<std::wstring> QtUiServices::getOpenFileNames(const std::wstring& tit
 std::wstring QtUiServices::getSaveFileName(const std::wstring& title, const std::wstring& filter, const std::wstring& dir)
 {
 	return QFileDialog::getSaveFileName(QApplication::activeWindow(), QString::fromStdWString(title), QString::fromStdWString(dir), QString::fromStdWString(filter)).toStdWString();
+}
+
+std::wstring QtUiServices::getSaveFileNameEx(const std::wstring& title, const std::wstring& filter, const std::wstring& dir,
+	const std::wstring& defExt, const std::wstring& checkboxLabel, bool* checkboxState)
+{
+	QFileDialog dlg(QApplication::activeWindow(), QString::fromStdWString(title), QString::fromStdWString(dir), QString::fromStdWString(filter));
+	dlg.setAcceptMode(QFileDialog::AcceptSave);
+	dlg.setFileMode(QFileDialog::AnyFile);
+	if (!defExt.empty())
+		dlg.setDefaultSuffix(QString::fromStdWString(defExt));
+
+	QCheckBox* checkbox = nullptr;
+	if (!checkboxLabel.empty())
+	{
+		// NPLX: upstream adds the checkbox to the native IFileDialog; a desktop (portal) dialog cannot take one, so
+		// the Qt dialog is used then
+		dlg.setOption(QFileDialog::DontUseNativeDialog);
+		checkbox = new QCheckBox(QString::fromStdWString(checkboxLabel), &dlg);
+		if (auto* grid = qobject_cast<QGridLayout*>(dlg.layout()))
+			grid->addWidget(checkbox, grid->rowCount(), 0, 1, grid->columnCount());
+		else
+			checkbox->hide();
+	}
+
+	std::wstring fileName;
+	if (dlg.exec() == QDialog::Accepted && !dlg.selectedFiles().isEmpty())
+		fileName = dlg.selectedFiles().first().toStdWString();
+	if (checkboxState)
+		*checkboxState = checkbox && checkbox->isChecked();
+	return fileName;
 }
 
 bool QtUiServices::getText(const std::wstring& title, const std::wstring& label, std::wstring& text)
