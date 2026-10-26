@@ -49,6 +49,7 @@ class QMenu;
 class QSplitter;
 class DocTabView;
 class FindReplaceDlg;
+class FindIncrementDlg;
 class PreferenceDlg;
 class GoToLineDlg;
 class UserDefineDialog;
@@ -253,6 +254,7 @@ public:
 	bool preferenceMessage(unsigned int message, uptr_t wParam, sptr_t lParam, intptr_t& result);
 	PreferenceDlg* getPreferenceDlg() const { return _preference; } // NPLX: tests
 	FindReplaceDlg* getFindReplaceDlg() const { return _findReplaceDlg; } // NPLX
+	FindIncrementDlg* getIncrementFindDlg() const { return _incrementFindDlg; } // NPLX: tests
 	GoToLineDlg* getGoToLineDlg() const { return _goToLineDlg; } // NPLX
 	UserDefineDialog* getUserDefineDlg() const { return _userDefineDlg; } // NPLX: upstream ScintillaEditView::getUserDefineDlg()
 
@@ -435,6 +437,7 @@ private:
 	// the icon size and style of nppGUI._tbIconInfo
 	void applyToolbarIconSet();
 	void launchDocumentBackupTask(); // upstream: starts the backupDocument thread
+	void placeIncrementalSearchBar(); // upstream addToRebar of the incremental search bar
 	QString fileDialogDir() const; // Preferences > Default Directory
 	void rememberFileDialogDir(const QString& filePath);
 	void refreshDarkMode(bool resetStyle);
@@ -475,6 +478,8 @@ private:
 	std::unique_ptr<QtNppMenu> _mainMenuHandle; // NppMenu view of the menu bar (upstream _mainMenuHandle)
 	ContextMenu _tabPopupMenu;
 	FindReplaceDlg* _findReplaceDlg = nullptr;
+	class FindIncrementDlg* _incrementFindDlg = nullptr; // upstream _incrementFindDlg
+	class QToolBar* _incrementFindBar = nullptr;           // NPLX: the row of the incremental search bar
 	PreferenceDlg* _preference = nullptr; // created on first use (upstream: created by IDM_SETTING_PREFERENCE)
 	bool _altAloneDown = false;           // Alt pressed alone, to show a hidden menu bar
 	RunDlg* _runDlg = nullptr;

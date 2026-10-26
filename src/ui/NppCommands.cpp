@@ -856,9 +856,33 @@ void Notepad_plus::command(int id)
 			break;
 		}
 
+		case IDM_SEARCH_FINDINCREMENT :
+		{
+			// upstream: the accelerator table of the incremental search bar while it has the focus
+			if (_incrementFindDlg->isVisibleBar() && _incrementFindDlg->hasFocusWithin())
+			{
+				_incrementFindDlg->command(IDM_SEARCH_FINDINCREMENT);
+				break;
+			}
+			// NPLX_TODO(Phase 8): _nativeLangSpeaker.changeDlgLang(_incrementFindDlg, "IncrementalFind") on first use
+
+			auto str = _pEditView->getSelectedTextToWChar(false);
+			if (!str.empty())         // the selected text is not empty, then use it
+				_incrementFindDlg->setSearchText(str.c_str(), _pEditView->getCurrentBuffer()->getUnicodeMode() != uni8Bit);
+
+			_incrementFindDlg->display();
+		}
+		break;
+
 		case IDM_SEARCH_FINDNEXT :
 		case IDM_SEARCH_FINDPREV :
 		{
+			// upstream: the accelerator table of the incremental search bar while it has the focus
+			if (_incrementFindDlg->isVisibleBar() && _incrementFindDlg->hasFocusWithin())
+			{
+				_incrementFindDlg->command(id);
+				break;
+			}
 			if (_findReplaceDlg->isCreated())
 			{
 				FindOption op = _findReplaceDlg->getCurrentOptions();

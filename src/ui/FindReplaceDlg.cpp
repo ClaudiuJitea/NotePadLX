@@ -4868,3 +4868,363 @@ void FindReplaceDlg::command(int id)
 			break;
 	}
 }
+
+// ---------------------------------------------------------------------------------------------------------------------
+// FindIncrementDlg
+
+FindIncrementDlg::FindIncrementDlg(QWidget* parent)
+	: QWidget(parent)
+{
+	setObjectName(QStringLiteral("FindIncrementDlg"));
+}
+
+void FindIncrementDlg::init(FindReplaceDlg* pFRDlg, bool isRTL)
+{
+	if (!pFRDlg)
+		throw std::runtime_error("FindIncrementDlg::init : Parameter pFRDlg is null");
+	_pFRDlg = pFRDlg;
+	_isRTL = isRTL;
+	if (isRTL)
+		setLayoutDirection(Qt::RightToLeft);
+
+	// upstream IDD_INCREMENT_FIND: ✕, "Find:", the text, <, >, Match case, Highlight all, Count, the status, the
+	// position toggle
+	auto* layout = new QHBoxLayout(this);
+	layout->setContentsMargins(6, 3, 6, 3);
+	layout->setSpacing(6);
+
+	auto makeButton = [this, layout](int id, const QString& text, const QString& tip) {
+		auto* button = new QPushButton(text, this);
+		button->setAutoDefault(false);
+		button->setProperty("compact", true);
+		button->setFixedWidth(28);
+		button->setToolTip(tip);
+		_ctrls[id] = button;
+		connect(button, &QPushButton::clicked, this, [this, id]() { command(id); });
+		layout->addWidget(button);
+		return button;
+	};
+	auto makeCheck = [this, layout](int id, const QString& text) {
+		auto* check = new QCheckBox(text, this);
+		_ctrls[id] = check;
+		connect(check, &QCheckBox::clicked, this, [this, id]() { command(id); });
+		layout->addWidget(check);
+		return check;
+	};
+
+	makeButton(IDCANCEL, QStringLiteral("✕"), QStringLiteral("Close"));
+	auto* label = new QLabel(QStringLiteral("Find:"), this);
+	_ctrls[IDC_INCSTATIC] = label;
+	layout->addWidget(label);
+	auto* edit = new QLineEdit(this);
+	edit->setMaxLength(FINDREPLACE_MAXLENGTH - 1);
+	edit->setMinimumWidth(260);
+	edit->installEventFilter(this);
+	label->setBuddy(edit);
+	_ctrls[IDC_INCFINDTEXT] = edit;
+	connect(edit, &QLineEdit::textEdited, this, [this]() { command(IDC_INCFINDTEXT); }); // upstream EN_CHANGE
+	layout->addWidget(edit);
+	makeButton(IDC_INCFINDPREVOK, QStringLiteral("<"), QStringLiteral("Find Previous"));
+	makeButton(IDC_INCFINDNXTOK, QStringLiteral(">"), QStringLiteral("Find Next"));
+	layout->addSpacing(6);
+	makeCheck(IDC_INCFINDMATCHCASE, QStringLiteral("Match &case"));
+	makeCheck(IDC_INCFINDHILITEALL, QStringLiteral("&Highlight all"));
+	makeCheck(IDC_INCFINDCOUNT, QStringLiteral("Count"));
+	auto* status = new QLabel(this);
+	_ctrls[IDC_INCFINDSTATUS] = status;
+	layout->addSpacing(6);
+	layout->addWidget(status, 1);
+	makeButton(IDC_GOUPDOWN_TOGGLE_BUTTON, QString(), QStringLiteral("Move the bar to the top or the bottom"));
+
+	// upstream WM_INITDIALOG
+	const FindHistory& findHistory = NppParameters::getInstance().getFindHistory();
+	static_cast<QCheckBox*>(_ctrls[IDC_INCFINDMATCHCASE])->setChecked(findHistory._isIncrementalMatchCase);
+	static_cast<QCheckBox*>(_ctrls[IDC_INCFINDHILITEALL])->setChecked(findHistory._isIncrementalHighlightAll);
+	static_cast<QCheckBox*>(_ctrls[IDC_INCFINDCOUNT])->setChecked(findHistory._isIncrementalCount);
+
+	NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+	static_cast<QPushButton*>(_ctrls[IDC_GOUPDOWN_TOGGLE_BUTTON])->setText(nppGUI._incrementalSearchBarAtTop ? QStringLiteral("˅") : QStringLiteral("˄"));
+}
+
+QWidget* FindIncrementDlg::dlgItem(int id) const
+{
+	auto it = _ctrls.find(id);
+	return it == _ctrls.end() ? nullptr : it->second;
+}
+
+bool FindIncrementDlg::isCheckedOrNot(int id) const
+{
+	auto* button = qobject_cast<QAbstractButton*>(dlgItem(id));
+	return button && button->isChecked();
+}
+
+bool FindIncrementDlg::isVisibleBar() const
+{
+	return _host ? _host->isVisible() : isVisible();
+}
+
+bool FindIncrementDlg::hasFocusWithin() const
+{
+	QWidget* focus = QApplication::focusWidget();
+	return focus && isAncestorOf(focus);
+}
+
+void FindIncrementDlg::display(bool toShow)
+{
+	if (toShow)
+	{
+		if (_host)
+			_host->show();
+		show();
+		auto* edit = static_cast<QLineEdit*>(dlgItem(IDC_INCFINDTEXT));
+		edit->setFocus();
+		// select the whole find editor text
+		edit->selectAll();
+	}
+	else if (_host)
+	{
+		_host->hide();
+	}
+	else
+	{
+		hide();
+	}
+}
+
+void FindIncrementDlg::setSearchText(const wchar_t* txt2find, bool)
+{
+	static_cast<QLineEdit*>(dlgItem(IDC_INCFINDTEXT))->setText(QString::fromWCharArray(txt2find));
+}
+
+bool FindIncrementDlg::eventFilter(QObject* watched, QEvent* event)
+{
+	// upstream: Enter in the edit field is IDOK (Shift+Enter searches backward), Esc is IDCANCEL
+	if (watched == dlgItem(IDC_INCFINDTEXT) && event->type() == QEvent::KeyPress)
+	{
+		auto* keyEvent = static_cast<QKeyEvent*>(event);
+		if (keyEvent->key() == Qt::Key_Return || keyEvent->key() == Qt::Key_Enter)
+		{
+			command(IDOK, keyEvent->modifiers() & Qt::ShiftModifier);
+			return true;
+		}
+		if (keyEvent->key() == Qt::Key_Escape)
+		{
+			command(IDCANCEL);
+			return true;
+		}
+	}
+	return QWidget::eventFilter(watched, event);
+}
+
+void FindIncrementDlg::command(int id, bool isShiftDown)
+{
+	bool updateSearch = false;
+	bool forward = true;
+	bool advance = false;
+	bool updateHiLight = false;
+	bool updateCase = false;
+
+	switch (id)
+	{
+		case IDC_GOUPDOWN_TOGGLE_BUTTON:
+		{
+			NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+			nppGUI._incrementalSearchBarAtTop = !nppGUI._incrementalSearchBarAtTop;
+			static_cast<QPushButton*>(dlgItem(IDC_GOUPDOWN_TOGGLE_BUTTON))->setText(nppGUI._incrementalSearchBarAtTop ? QStringLiteral("˅") : QStringLiteral("˄"));
+			emit positionToggled(); // upstream ::SendMessage(_hParent, NPPM_INTERNAL_INCSEARCHBARPOSITION, 0, 0)
+			return;
+		}
+
+		case IDCANCEL:
+			(*(_pFRDlg->_ppEditView))->clearIndicator(SCE_UNIVERSAL_FOUND_STYLE_INC);
+			(*(_pFRDlg->_ppEditView))->setFocus(); // upstream grabFocus
+			display(false);
+			_matches.clear();
+			return;
+
+		case IDM_SEARCH_FINDINCREMENT:	// Accel table: Start incremental search
+			// if focus is on a some other control, return it to the edit field
+			if (QApplication::focusWidget() != dlgItem(IDC_INCFINDTEXT))
+			{
+				dlgItem(IDC_INCFINDTEXT)->setFocus();
+				return;
+			}
+			// otherwise, repeat the search
+			[[fallthrough]];
+		case IDM_SEARCH_FINDPREV:		// Accel table: find prev
+		case IDM_SEARCH_FINDNEXT:		// Accel table: find next
+		case IDC_INCFINDPREVOK:
+		case IDC_INCFINDNXTOK:
+		case IDOK:						// Enter key in the edit field
+			updateSearch = true;
+			advance = true;
+			forward = (id == IDC_INCFINDNXTOK) ||
+				(id == IDM_SEARCH_FINDNEXT) ||
+				(id == IDM_SEARCH_FINDINCREMENT) ||
+				((id == IDOK) && !isShiftDown);
+			break;
+
+		case IDC_INCFINDMATCHCASE:
+			NppParameters::getInstance().getFindHistory()._isIncrementalMatchCase = isCheckedOrNot(IDC_INCFINDMATCHCASE);
+			updateSearch = true;
+			updateCase = true;
+			updateHiLight = true;
+			_matches.clear();
+			break;
+
+		case IDC_INCFINDHILITEALL:
+			NppParameters::getInstance().getFindHistory()._isIncrementalHighlightAll = isCheckedOrNot(IDC_INCFINDHILITEALL);
+			updateHiLight = true;
+			break;
+
+		case IDC_INCFINDCOUNT:
+			NppParameters::getInstance().getFindHistory()._isIncrementalCount = isCheckedOrNot(IDC_INCFINDCOUNT);
+			_matches.clear();
+			break;
+
+		case IDC_INCFINDTEXT: // EN_CHANGE
+			updateSearch = true;
+			updateHiLight = isCheckedOrNot(IDC_INCFINDHILITEALL);
+			updateCase = isCheckedOrNot(IDC_INCFINDMATCHCASE);
+			_matches.clear();
+			break;
+
+		default:
+			return;
+	}
+
+	FindOption fo;
+	fo._isWholeWord = false;
+	fo._incrementalType = advance ? NextIncremental : FirstIncremental;
+	fo._whichDirection = forward ? DIR_DOWN : DIR_UP;
+	fo._isMatchCase = isCheckedOrNot(IDC_INCFINDMATCHCASE);
+
+	const std::wstring str2Search = static_cast<QLineEdit*>(dlgItem(IDC_INCFINDTEXT))->text().toStdWString();
+	if (updateSearch)
+	{
+		FindStatus findStatus = FSFound;
+		MatchPosition match;
+		bool isFound = _pFRDlg->processFindNext(str2Search.c_str(), &fo, &findStatus, FINDNEXTTYPE_FINDNEXT, &match);
+
+		fo._str2Search = str2Search;
+		intptr_t nth = 0;
+		if (isCheckedOrNot(IDC_INCFINDCOUNT))
+		{
+			if (!_matches.size())
+				_pFRDlg->processAll(ProcessCountAll, &fo, false, nullptr, -1, &_matches);
+			if (_matches.size() && (match.start > -1) && (match.end > -1))
+			{
+				size_t totalMatches = _matches.size();
+				for (size_t i = 0; i < totalMatches; ++i)
+				{
+					if ((match.start == _matches[i].start) && (match.end == _matches[i].end))
+					{
+						nth = i + 1;
+						break;
+					}
+				}
+			}
+		}
+		setFindStatus(findStatus, _matches.size(), static_cast<int>(nth));
+
+		// If case-sensitivity changed (to Match=yes), there may have been a matched selection that
+		// now does not match; so if Not Found, clear selection and put caret at beginning of what was
+		// selected (no change, if there was no selection)
+		if (updateCase && !isFound)
+		{
+			Sci_CharacterRangeFull range = (*(_pFRDlg->_ppEditView))->getSelection();
+			(*(_pFRDlg->_ppEditView))->execute(SCI_SETSEL, static_cast<uptr_t>(-1), range.cpMin);
+		}
+	}
+
+	if (updateHiLight)
+	{
+		bool highlight = !str2Search.empty() && isCheckedOrNot(IDC_INCFINDHILITEALL);
+		markSelectedTextInc(highlight, &fo);
+	}
+}
+
+void FindIncrementDlg::markSelectedTextInc(bool enable, FindOption* opt)
+{
+	(*(_pFRDlg->_ppEditView))->clearIndicator(SCE_UNIVERSAL_FOUND_STYLE_INC);
+
+	if (!enable)
+		return;
+
+	//Get selection
+	Sci_CharacterRangeFull range = (*(_pFRDlg->_ppEditView))->getSelection();
+
+	//If nothing selected, don't mark anything
+	if (range.cpMin == range.cpMax)
+		return;
+
+	auto text2Find = (*(_pFRDlg->_ppEditView))->getSelectedTextToWChar(false);	//do not expand selection (false)
+	if (text2Find.empty())
+		return;
+	opt->_str2Search = text2Find;
+	_pFRDlg->markAllInc(opt);
+}
+
+void FindIncrementDlg::setFindStatus(FindStatus iStatus, size_t nbCounted, int nth)
+{
+	std::wstring statusStr2Display;
+
+	static const wchar_t* const strFSNotFound = L"Phrase not found";
+	static const wchar_t* const strFSTopReached = L"Reached top of page, continued from bottom";
+	static const wchar_t* const strFSEndReached = L"Reached end of page, continued from top";
+
+	NativeLangSpeaker* pNativeSpeaker = (NppParameters::getInstance()).getNativeLangSpeaker();
+
+	if (nbCounted > 0)
+		statusStr2Display = commafyInt(nth) + L"/" + commafyInt(nbCounted);
+
+	switch (iStatus)
+	{
+		case FindStatus::FSNotFound:
+			statusStr2Display = pNativeSpeaker->getLocalizedStrFromID("IncrementalFind-FSNotFound", strFSNotFound);
+			break;
+
+		case FindStatus::FSTopReached:
+		{
+			auto topReached = pNativeSpeaker->getLocalizedStrFromID("IncrementalFind-FSTopReached", strFSTopReached);
+			if (nbCounted > 0)
+				statusStr2Display += (L" - " + topReached);
+			else
+				statusStr2Display = topReached;
+			break;
+		}
+
+		case FindStatus::FSEndReached:
+		{
+			auto endReached = pNativeSpeaker->getLocalizedStrFromID("IncrementalFind-FSEndReached", strFSEndReached);
+			if (nbCounted > 0)
+				statusStr2Display += (L" - " + endReached);
+			else
+				statusStr2Display = endReached;
+			break;
+		}
+
+		case FindStatus::FSFound:
+			break;
+
+		case FindStatus::FSResetCount:
+			statusStr2Display = L"";
+			break;
+
+		default:
+			return; // out of range
+	}
+
+	_findStatus = iStatus;
+
+	// upstream WM_CTLCOLOREDIT: the edit field is red when the text is not found
+	auto* edit = static_cast<QLineEdit*>(dlgItem(IDC_INCFINDTEXT));
+	if (FSNotFound == iStatus)
+		edit->setStyleSheet(QStringLiteral("QLineEdit { background: #%1; color: #%2; }")
+			.arg(QColor(GetRValue(BCKGRD_COLOR), GetGValue(BCKGRD_COLOR), GetBValue(BCKGRD_COLOR)).name().mid(1))
+			.arg(QColor(GetRValue(TXT_COLOR), GetGValue(TXT_COLOR), GetBValue(TXT_COLOR)).name().mid(1)));
+	else
+		edit->setStyleSheet(QString());
+
+	static_cast<QLabel*>(dlgItem(IDC_INCFINDSTATUS))->setText(QString::fromStdWString(statusStr2Display));
+}

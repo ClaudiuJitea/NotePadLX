@@ -410,6 +410,12 @@ void Notepad_plus::init()
 	_findReplaceDlg->init(this, &_pEditView, [this](unsigned int message, uptr_t wParam, sptr_t lParam) {
 		return nppMessage(message, wParam, lParam);
 	});
+	// upstream Notepad_plus::init: _incrementFindDlg.init(...); placed in the window by placeIncrementalSearchBar
+	_incrementFindDlg = new FindIncrementDlg(this);
+	_incrementFindDlg->init(_findReplaceDlg, _nativeLangSpeaker.isRTL());
+	connect(_incrementFindDlg, &FindIncrementDlg::positionToggled, this, [this]() {
+		nppMessage(NPPM_INTERNAL_INCSEARCHBARPOSITION, 0, 0);
+	});
 	// upstream Notepad_plus::init: _runMacroDlg.init(...), _runDlg.init(...)
 	const ParentMessenger sendToNpp = [this](unsigned int message, uptr_t wParam, sptr_t lParam) {
 		return nppMessage(message, wParam, lParam);
@@ -467,6 +473,7 @@ void Notepad_plus::init()
 
 	buildMainMenu();
 	buildToolBar();
+	placeIncrementalSearchBar();
 	hideExcludedLanguages();
 	setupColorSampleBitmapsOnMainMenuItems();
 
@@ -905,6 +912,36 @@ void Notepad_plus::buildToolBar()
 	}
 
 	_toolBar->setVisible(NppParameters::getInstance().getNppGUI()._toolbarShow);
+}
+
+void Notepad_plus::placeIncrementalSearchBar()
+{
+	// upstream addToRebar(nppGUI._incrementalSearchBarAtTop ? &_rebarTop : &_rebarBottom): a row of its own, below the
+	// toolbar or above the status bar
+	const bool atTop = NppParameters::getInstance().getNppGUI()._incrementalSearchBarAtTop;
+	const bool isShown = _incrementFindBar && _incrementFindBar->isVisible();
+	if (!_incrementFindBar)
+	{
+		_incrementFindBar = new QToolBar(tr("Incremental Search"), this);
+		_incrementFindBar->setObjectName(QStringLiteral("incrementalSearchBar"));
+		_incrementFindBar->setMovable(false);
+		_incrementFindBar->setFloatable(false);
+		_incrementFindBar->toggleViewAction()->setVisible(false);
+		_incrementFindBar->addWidget(_incrementFindDlg);
+		_incrementFindDlg->setHost(_incrementFindBar);
+	}
+	else
+	{
+		removeToolBar(_incrementFindBar);
+		removeToolBarBreak(_incrementFindBar);
+	}
+	const Qt::ToolBarArea area = atTop ? Qt::TopToolBarArea : Qt::BottomToolBarArea;
+	if (atTop)
+		addToolBarBreak(area);
+	addToolBar(area, _incrementFindBar);
+	_incrementFindBar->setVisible(isShown);
+	if (isShown)
+		_incrementFindDlg->display(true);
 }
 
 void Notepad_plus::checkMenuItem(int itemID, bool willBeChecked)
@@ -1411,6 +1448,10 @@ void Notepad_plus::notifyBufferActivated(BufferID bufid, int view)
 
 	_linkTriggered = true;
 
+	// check if possible IncrementalSearch does not need reset
+	if (_incrementFindDlg && _incrementFindDlg->isVisibleBar())
+		_incrementFindDlg->reInitCount();
+
 	if (_pDocMap && (!_pDocMap->isClosed()) && _pDocMap->isVisible())
 	{
 		_pDocMap->reloadMap();
@@ -1455,6 +1496,13 @@ void Notepad_plus::notifyBufferChanged(Buffer* buffer, int mask)
 
 			case DOC_MODIFIED:	//ask for reloading
 			{
+				// check if possible IncrementalSearch does not need reset
+				if (_incrementFindDlg && _incrementFindDlg->isVisibleBar())
+				{
+					if (_pEditView->getCurrentBuffer() == buffer)
+						_incrementFindDlg->reInitCount();
+				}
+
 				// Since it is being monitored DOC_NEEDRELOAD is going to handle the change.
 				if (buffer->isMonitoringOn())
 					break;
@@ -1490,6 +1538,10 @@ void Notepad_plus::notifyBufferChanged(Buffer* buffer, int mask)
 
 			case DOC_NEEDRELOAD: // by log monitoring
 			{
+				// check if possible IncrementalSearch does not need reset
+				if (_incrementFindDlg && _incrementFindDlg->isVisibleBar())
+					_incrementFindDlg->reInitCount();
+
 				doReload(buffer->getID(), false);
 
 				// not only test main view
@@ -1934,6 +1986,13 @@ void Notepad_plus::onScintillaNotify(Scintilla::NotificationData* scnData)
 
 				// for the backup system
 				buffer->setModifiedStatus(true);
+
+				// check if possible IncrementalSearch does not need reset
+				if (_incrementFindDlg && _incrementFindDlg->isVisibleBar())
+				{
+					if (_incrementFindDlg->getAssociatedScintillaView() == notifyView)
+						_incrementFindDlg->reInitCount();
+				}
 			}
 			break;
 		}

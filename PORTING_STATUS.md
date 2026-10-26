@@ -8,7 +8,7 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 | 1. Portable core | ✅ Done (2026‑10‑24) |
 | 2. Main window | 🚧 Mostly done (menus, toolbar, context menus, 379 commands ported) |
 | 3. Files, sessions, monitoring | 🚧 Mostly done (see session 3) |
-| 4. Find / Replace | 🚧 Mostly done (dialog, Finder, Find in Files, Mark, smart highlight; incremental search open) |
+| 4. Find / Replace | ✅ Done (2026‑10‑26): dialog, Finder, Find in Files, Mark, smart highlight, incremental search |
 | 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
 | 7. Dialogs and tools | ✅ Done (2026‑10‑25): macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages), Find characters in range, Edit Popup ContextMenu, style theme import |
@@ -18,7 +18,7 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 
 **Current version: 0.6** (2026‑10‑25): sessions 10–14 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
 
-## Session 16 (2026‑10‑26): tab colours
+## Session 16 (2026‑10‑26): tab colours, incremental search
 
 - **View › Tab › Apply Color 1–5 / Remove Color** (also in the tab context menu): upstream individual tab colours, the
   buffer's colour id (`Buffer::setDocColorId`), saved in sessions (`tabColourId`) and restored. `DocTabView` draws an
@@ -27,7 +27,15 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
   colour as background.
 - **Menu colour samples** (upstream `setupColorSampleBitmapsOnMainMenuItems`): the Search › Mark style items and the
   tab colour items show their colours; they follow the Style Configurator (WM_UPDATEMAINMENUBITMAPS) and dark mode.
-- **Tests:** `tst_tools` `tabColours`, and `saveAndLoadSession` keeps a tab colour. 17/17 suites pass.
+- **Search › Incremental Search (Ctrl+Alt+I):** port of upstream `FindIncrementDlg` (IDD_INCREMENT_FIND: the same
+  controls and IDs) as a QWidget bar in a toolbar row, at the bottom or the top (the ˄ / ˅ button,
+  `_incrementalSearchBarAtTop`; upstream: a rebar band). It searches while typing, Enter / Shift+Enter or < / > go to
+  the next / previous match, Match case, Highlight all, Count ("n/total"), the red edit field and "Phrase not found",
+  Esc closes it; the selected text fills it. Find Next / Previous (F3 / Shift+F3) and Ctrl+Alt+I go to the bar while it
+  has the focus (upstream: its accelerator table). The count is reset when the document changes, as upstream.
+- **Tests:** `tst_tools` `tabColours`, `saveAndLoadSession` keeps a tab colour, `tst_findreplace`
+  `incrementalSearch`. 17/17 suites pass.
+- **Next:** Phase 8: printing, runtime localization of the dialogs, the tray icon, Move / Open in New Instance.
 
 ## Session 15 (2026‑10‑25): Phase 7 done — Find characters in range, Edit Popup ContextMenu, theme import, sessions
 
@@ -233,7 +241,6 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 3/4 leftovers | Search › Incremental Search (Ctrl+Alt+I) |
 | 8 | File › Print… (Ctrl+P), Print Now; View › Move/Clone › Move to / Open in New Instance; localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |

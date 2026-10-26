@@ -950,6 +950,12 @@ bool Notepad_plus::preferenceMessage(unsigned int message, uptr_t wParam, sptr_t
 			return true;
 		}
 
+		case NPPM_INTERNAL_INCSEARCHBARPOSITION:
+		{
+			placeIncrementalSearchBar();
+			return true;
+		}
+
 		case NPPM_INTERNAL_NPLX_SHOWLANGMENUITEM:
 		{
 			showLanguageMenuItem(static_cast<int>(wParam), lParam != FALSE);

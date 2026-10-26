@@ -22,6 +22,9 @@
 #include <QComboBox>
 #include <QDir>
 #include <QTabBar>
+#include <QToolBar>
+#include <QLabel>
+#include <QLineEdit>
 #include <QTemporaryDir>
 
 #include <cstdlib>
@@ -558,6 +561,69 @@ private slots:
 		}
 		tabs->setCurrentIndex(0);
 		dlg()->command(IDCANCEL);
+	}
+
+	void incrementalSearch()
+	{
+		// Search > Incremental Search (upstream FindIncrementDlg): a bar that searches while typing
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_SEARCH_FINDINCREMENT));
+		newDocument("alpha beta\nalpha gamma\nALPHA delta\n");
+		FindIncrementDlg* inc = _npp->getIncrementFindDlg();
+		QVERIFY(inc);
+		QVERIFY(!inc->isVisibleBar());
+		_npp->command(IDM_SEARCH_FINDINCREMENT);
+		QVERIFY(inc->isVisibleBar());
+
+		auto check = [inc](int id, bool on) {
+			auto* box = qobject_cast<QAbstractButton*>(inc->dlgItem(id));
+			if (box->isChecked() != on)
+				box->click();
+		};
+		check(IDC_INCFINDMATCHCASE, false);
+		check(IDC_INCFINDCOUNT, true);
+		check(IDC_INCFINDHILITEALL, false);
+
+		auto* edit = qobject_cast<QLineEdit*>(inc->dlgItem(IDC_INCFINDTEXT));
+		QVERIFY(edit);
+		edit->setFocus();
+		QTest::keyClicks(edit, QStringLiteral("alpha"));
+		QCOMPARE(view()->execute(SCI_GETSELECTIONSTART), 0);
+		QCOMPARE(view()->execute(SCI_GETSELECTIONEND), 5);
+		auto status = [inc]() { return qobject_cast<QLabel*>(inc->dlgItem(IDC_INCFINDSTATUS))->text(); };
+		QCOMPARE(status(), QStringLiteral("1/3")); // ignore case: ALPHA too
+
+		// Enter: the next one; Shift+Enter: back
+		QTest::keyClick(edit, Qt::Key_Return);
+		QCOMPARE(view()->execute(SCI_GETSELECTIONSTART), 11);
+		QCOMPARE(status(), QStringLiteral("2/3"));
+		QTest::keyClick(edit, Qt::Key_Return, Qt::ShiftModifier);
+		QCOMPARE(view()->execute(SCI_GETSELECTIONSTART), 0);
+
+		// Match case: ALPHA is not counted
+		check(IDC_INCFINDMATCHCASE, true);
+		QCOMPARE(status(), QStringLiteral("1/2"));
+
+		// not found: the status says so
+		QTest::keyClicks(edit, QStringLiteral("zzz"));
+		QCOMPARE(inc->getFindStatus(), FSNotFound);
+		QCOMPARE(status(), QStringLiteral("Phrase not found"));
+		check(IDC_INCFINDMATCHCASE, false);
+
+		// the bar moves to the top and back (upstream NPPM_INTERNAL_INCSEARCHBARPOSITION)
+		auto* bar = _npp->findChild<QToolBar*>(QStringLiteral("incrementalSearchBar"));
+		QVERIFY(bar);
+		QCOMPARE(_npp->toolBarArea(bar), Qt::BottomToolBarArea);
+		qobject_cast<QAbstractButton*>(inc->dlgItem(IDC_GOUPDOWN_TOGGLE_BUTTON))->click();
+		QCOMPARE(_npp->toolBarArea(bar), Qt::TopToolBarArea);
+		QVERIFY(inc->isVisibleBar());
+		qobject_cast<QAbstractButton*>(inc->dlgItem(IDC_GOUPDOWN_TOGGLE_BUTTON))->click();
+		QCOMPARE(_npp->toolBarArea(bar), Qt::BottomToolBarArea);
+
+		// Esc closes the bar and gives the focus back to the editor
+		edit->setFocus();
+		QTest::keyClick(edit, Qt::Key_Escape);
+		QVERIFY(!inc->isVisibleBar());
+		_npp->command(IDM_FILE_CLOSE);
 	}
 
 	void escapeClosesDialog()

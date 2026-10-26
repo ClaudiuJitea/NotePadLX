@@ -492,4 +492,65 @@ private:
 	void updateInSelectionCheck(); // upstream WM_ACTIVATE (WA_ACTIVE)
 
 	enum SwapButtonStatus {swap, down, up} _swapButtonStatus = swap;
+
+	friend class FindIncrementDlg; // upstream: FindIncrementDlg reads _pFRDlg->_ppEditView
+};
+
+//FindIncrementDlg: incremental search dialog, docked in rebar
+// NPLX: a QWidget bar (upstream IDD_INCREMENT_FIND: the same controls and IDs) in a toolbar row of the main window,
+// at the bottom or the top (upstream: a band of the bottom or top rebar)
+class FindIncrementDlg : public QWidget
+{
+	Q_OBJECT
+public :
+	explicit FindIncrementDlg(QWidget* parent = nullptr);
+
+	void init(FindReplaceDlg* pFRDlg, bool isRTL = false);
+	void display(bool toShow = true);
+	bool isVisibleBar() const; // upstream isVisible: the band is shown
+
+	void setSearchText(const wchar_t* txt2find, bool);
+
+	void setFindStatus(FindStatus iStatus, size_t nbCounted, int nth);
+
+	FindStatus getFindStatus() const { return _findStatus; }
+
+	void reInitCount() {
+		if (_matches.size() > 0)
+		{
+			_matches.clear();
+			setFindStatus(FindStatus::FSResetCount, 0, 0);
+		}
+	}
+
+	ScintillaEditView* getAssociatedScintillaView() const {
+		if (_pFRDlg)
+			return *(_pFRDlg->_ppEditView);
+		else
+			return nullptr;
+	}
+
+	// upstream WM_COMMAND (also the accelerators IDM_SEARCH_FINDINCREMENT, FINDNEXT, FINDPREV while the bar has the focus)
+	void command(int id, bool isShiftDown = false);
+	bool hasFocusWithin() const;
+	QWidget* dlgItem(int id) const; // NPLX: tests
+	void setHost(QWidget* host) { _host = host; } // the toolbar row that holds the bar
+
+signals:
+	void positionToggled(); // upstream NPPM_INTERNAL_INCSEARCHBARPOSITION
+
+protected:
+	bool eventFilter(QObject* watched, QEvent* event) override;
+
+private :
+	void markSelectedTextInc(bool enable, FindOption* opt);
+	bool isCheckedOrNot(int id) const;
+
+	bool _isRTL = false;
+	FindReplaceDlg *_pFRDlg = nullptr;
+	FindStatus _findStatus = FSFound;
+	QWidget* _host = nullptr;
+	std::map<int, QWidget*> _ctrls;
+
+	std::vector<MatchPosition> _matches;
 };
