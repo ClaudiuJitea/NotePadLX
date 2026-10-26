@@ -6,17 +6,42 @@ Plan: [PROMPT.md](PROMPT.md). Upstream versions and patches: [UPSTREAM.md](UPSTR
 |---|---|
 | 0. Bootstrap | ✅ Done (2026‑10‑24) |
 | 1. Portable core | ✅ Done (2026‑10‑24) |
-| 2. Main window | 🚧 Mostly done (menus, toolbar, context menus, 379 commands ported) |
-| 3. Files, sessions, monitoring | 🚧 Mostly done (see session 3) |
-| 4. Find / Replace | ✅ Done (2026‑10‑26): dialog, Finder, Find in Files, Mark, smart highlight, incremental search |
-| 5. Languages and styling | ✅ Done except dialog localization (Phase 8) |
+| 2. Main window | ✅ Done (2026‑10‑26): menus, toolbar, context menus, right button + wheel switches documents |
+| 3. Files, sessions, monitoring | ✅ Done (2026‑10‑26): elevated save (pkexec), network mount timeouts, session files, -monitor |
+| 4. Find / Replace | ✅ Done (2026‑10‑26) except Find in Finder: dialog, Finder, Find in Files, Mark, smart highlight, incremental search |
+| 5. Languages and styling | ✅ Done (2026‑10‑26) |
 | 6. Docking panels | ✅ Done (2026‑10‑25): all panels, Windows dialog, Ctrl+Tab, dock layout persistence |
 | 7. Dialogs and tools | ✅ Done (2026‑10‑25): macros, Run menu, Shortcut / Run / Run Macro dialogs, Column Editor, MD5/SHA hashes, Shortcut Mapper, Preferences (23 pages), Find characters in range, Edit Popup ContextMenu, style theme import |
-| 8. Polish and platform integration | 🚧 Started: themes and look, About / Debug Info / Command Line Arguments, full screen / post-it / distraction free, Check for Updates, printing, Move / Open in New Instance, Pin Tab, tray icon, desktop light / dark switch, theme tab colours, most dialogs translated; Preferences / Find / Style Configurator / UDL translations and runtime language reload next |
+| 8. Polish and platform integration | ✅ Done (2026‑10‑26): themes and look, About / Debug Info, full screen / post-it / distraction free, Check for Updates, printing, Move / Open in New Instance, Pin Tab, tray icon, desktop light / dark switch, runtime localization of the menus and dialogs |
 | 9. Plugin API for Linux | ⏳ Planned |
-| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.8); Flatpak, `.rpm` and CI next |
+| 10. Packaging and CI | 🚧 Started (2026‑10‑25): `.deb` and AppImage (versions 0.1–0.9); Flatpak, `.rpm` and CI next |
 
-**Current version: 0.8** (2026‑10‑26): sessions 10–19 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+**Current version: 0.9** (2026‑10‑26): sessions 10–20 on top of 0.1. Repository: https://github.com/ClaudiuJitea/NotePadLX
+
+## Session 20 (2026‑10‑26): version 0.9 — runtime localization, the Phase 2/3/7 leftovers
+
+- **Localization** (`ui/LocalizationQt.*`): changePreferenceDlgLang, changeFindReplaceDlgLang, changeConfigLang,
+  changeUserDefineLang (+ the styler popup), the tab context menu (`<TabBar>`) and changeMenuLang for the menu and
+  submenu names (`<Entries>`, `<SubEntries>`, by the upstream MenuPosition recorded while the menu bar is built; before,
+  only the commands were translated). Preferences › General › Language switches at once (`Notepad_plus::reloadLang`:
+  English first, then the language; every dialog translated so far is translated again). Checkboxes and radio buttons
+  take their ideal width (resizeCheckboxRadioBtn).
+- **Style Configurator:** Save & Close keeps the theme of the current light / dark mode (setThemeName); Go to settings
+  opens the Preferences page of the style (goToPreferencesSettings, page order without File Association).
+- **Right button + wheel** switches documents (WM_MOUSEWHEEL with MK_RBUTTON); the editor context menu opens on the
+  release, and not after such a switch (`_isTaskListRBUTTONUP_Active`). The editor's `nppMessage` signal is now connected.
+- **Files:** session / workspace files open as such (doOpen), getHtmlXmlEncoding, useFirstLineAsTabName, `-monitor`,
+  the four-button network path warning, the fsync failure warning. getFileAttributesExWithTimeout and the
+  doesFileExist family run in a worker thread with upstream's 3 s default (a worker blocked by a hung mount is left
+  behind). invokeNppUacOp runs the operation through pkexec (cp / mv / touch; `NPLX_ELEVATE` replaces pkexec); the
+  read-only attribute is now a file without any write permission, so a file only root may write opens editable and is
+  saved elevated.
+- **Shortcuts:** the OEM key names stay the characters Qt matches (upstream mapOemVirtualKeys renames them after the
+  physical key, which Qt does not use).
+- **Tests:** `tst_localization` (English → French → English at runtime), theme pairing, Go to settings, right button +
+  wheel, HTML / XML encoding, session file, first line as tab name, `-monitor`, timeouts, network path box, elevated
+  save. 18/18 suites pass.
+- **Next:** Find in Finder (Phase 4), then Phase 9 (plugins).
 
 ## Session 19 (2026‑10‑26): version 0.8 — Pin Tab, tray icon, dialog translations
 
@@ -294,7 +319,6 @@ one is planned:
 
 | Phase | Menu items |
 |---|---|
-| 8 | Localization of the dialogs |
 | 9 | Plugins › Open Plugins Folder…; Settings › Import › Import plugin(s)… (Linux `.so` plugins) |
 | 10 | Packaging and CI (no menu items) |
 

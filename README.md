@@ -6,7 +6,7 @@
 
 **Notepad++, ported to Linux** — a native Qt 6 editor built from the Notepad++ sources.
 
-[![Version](https://img.shields.io/badge/version-0.8-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
+[![Version](https://img.shields.io/badge/version-0.9-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 [![Qt 6](https://img.shields.io/badge/Qt-6-41cd52?logo=qt&logoColor=white)](https://www.qt.io/)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-fcc624?logo=linux&logoColor=black)](#install)
@@ -37,8 +37,8 @@ themes, user defined languages and macros work as they are.
 Download from [Releases](https://github.com/ClaudiuJitea/NotePadLX/releases):
 
 ```sh
-chmod +x NotePadLX-0.8-x86_64.AppImage && ./NotePadLX-0.8-x86_64.AppImage   # any distro, glibc 2.43+
-sudo apt install ./notepadlx_0.8_amd64.deb                                   # Ubuntu 26.04 (Qt 6.10)
+chmod +x NotePadLX-0.9-x86_64.AppImage && ./NotePadLX-0.9-x86_64.AppImage   # any distro, glibc 2.43+
+sudo apt install ./notepadlx_0.9_amd64.deb                                   # Ubuntu 26.04 (Qt 6.10)
 ```
 
 On older distributions, build from source. Settings live in `~/.config/notepadlx/`; to bring your Notepad++
@@ -60,11 +60,10 @@ All other dependencies (Scintilla, Lexilla, Boost.Regex, pugixml, json, uchardet
 
 ## Status
 
-**0.8** — phases 0–7 done (core, main window, files and sessions, search with incremental search, languages, panels,
-dialogs and tools with **Preferences**). Phase 8 nearly done: printing, **Move / Open in New Instance**, **Pin Tab**, the
-**tray icon**, following the desktop's light / dark switch, theme tab colours, About, Debug Info, Check for Updates,
-full screen / Post-It / distraction free, and most dialogs translated; then the remaining dialog translations (8),
-a Linux plugin API (9), and Flatpak / CI (10). Unported commands are greyed out;
+**0.9** — phases 0–8 done (core, main window, files and sessions, search with incremental search, languages, panels,
+dialogs and tools with **Preferences**, printing, Move / Open in New Instance, Pin Tab, the tray icon, and the interface
+**translated, switched without a restart**). Files that need admin rights are saved through pkexec. Next: Find in
+Finder, a Linux plugin API (9), and Flatpak / CI (10). Unported commands are greyed out;
 Windows-only ones (PowerShell, registry, the WinGUp proxy) are removed. Details: [PORTING_STATUS.md](PORTING_STATUS.md),
 plan: [PROMPT.md](PROMPT.md).
 
