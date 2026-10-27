@@ -486,6 +486,80 @@ private slots:
 		QCOMPARE(QString::fromWCharArray(view()->getCurrentBuffer()->getFullPathName()), root + "/sub/three.txt");
 	}
 
+	void findInFinder()
+	{
+		const QString root = _tmp.path() + "/fifinder";
+		QVERIFY(QDir().mkpath(root));
+		writeFile(root + "/a.txt", "apple banana\napple\n");
+		writeFile(root + "/b.txt", "banana\n");
+		writeFile(root + "/c.txt", "pear\napple cherry\n");
+
+		// only this search in the main finder (it keeps the earlier ones, whose files would be searched too)
+		dlg()->getMainFinder()->removeAll();
+		_npp->command(IDM_SEARCH_FINDINFILES);
+		resetOptions();
+		setCombo(IDFINDWHAT, "apple");
+		setCombo(IDD_FINDINFILES_FILTERS_COMBO, "*.txt");
+		setCombo(IDD_FINDINFILES_DIR_COMBO, root);
+		dlg()->command(IDD_FINDINFILES_FIND_BUTTON);
+		QVERIFY2(finderText().contains("Search \"apple\" (3 hits in 2 files of 3 searched)"), qPrintable(finderText()));
+		Finder* mainFinder = dlg()->getMainFinder();
+		QVERIFY(dlg()->getFindersOfFinder().empty());
+
+		// the context menu item "Find in these search results..." opens the dialog
+		_npp->nppMessage(NPPM_INTERNAL_FINDINFINDERDLG, reinterpret_cast<uptr_t>(mainFinder), 0);
+		FindInFinderDlg* fifDlg = _npp->getFindInFinderDlg();
+		QVERIFY(fifDlg && fifDlg->isVisible());
+		// upstream defaults: only in the found lines, normal mode, ". matches newline" disabled
+		QVERIFY(fifDlg->isCheckedOrNot(IDC_MATCHLINENUM_CHECK_FIFOLDER));
+		QVERIFY(fifDlg->isCheckedOrNot(IDNORMAL_FIFOLDER));
+		QVERIFY(!fifDlg->dlgItem(IDREDOTMATCHNL_FIFOLDER)->isEnabled());
+		fifDlg->setChecked(IDNORMAL_FIFOLDER, false);
+		fifDlg->setChecked(IDREGEXP_FIFOLDER, true);
+		fifDlg->command(IDREGEXP_FIFOLDER);
+		QVERIFY(!fifDlg->dlgItem(IDWHOLEWORD_FIFOLDER)->isEnabled());
+		QVERIFY(fifDlg->dlgItem(IDREDOTMATCHNL_FIFOLDER)->isEnabled());
+		fifDlg->setChecked(IDREGEXP_FIFOLDER, false);
+		fifDlg->setChecked(IDNORMAL_FIFOLDER, true);
+		fifDlg->command(IDNORMAL_FIFOLDER);
+		screenshot(fifDlg, "find-in-finder.png");
+
+		// only the found lines: "cherry" is on a line with "apple", "banana" too (line 1 of a.txt)
+		fifDlg->comboBox(IDFINDWHAT_FIFOLDER)->setEditText("cherry");
+		fifDlg->command(IDOK);
+		QVERIFY(!fifDlg->isVisible());
+		QCOMPARE(dlg()->getFindersOfFinder().size(), size_t(1));
+		Finder* sub = dlg()->getFindersOfFinder().front();
+		QVERIFY(sub != mainFinder && sub->isVisible());
+		QString text = QString::fromStdString(sub->getScintView()->getText());
+		QVERIFY2(text.contains("Search \"cherry\" (1 hit in 1 file of 2 searched)"), qPrintable(text));
+		QVERIFY(text.contains(root + "/c.txt (1 hit)"));
+		QVERIFY(text.contains("\tLine 2: apple cherry"));
+
+		// the whole files of the results: b.txt is not searched, a.txt is
+		_npp->nppMessage(NPPM_INTERNAL_FINDINFINDERDLG, reinterpret_cast<uptr_t>(mainFinder), 0);
+		fifDlg->setChecked(IDC_MATCHLINENUM_CHECK_FIFOLDER, false);
+		fifDlg->comboBox(IDFINDWHAT_FIFOLDER)->setEditText("banana");
+		fifDlg->command(IDOK);
+		QCOMPARE(dlg()->getFindersOfFinder().size(), size_t(2));
+		Finder* sub2 = dlg()->getFindersOfFinder().back();
+		text = QString::fromStdString(sub2->getScintView()->getText());
+		QVERIFY2(text.contains("Search \"banana\" (1 hit in 1 file of 2 searched)"), qPrintable(text));
+		QVERIFY(text.contains(root + "/a.txt (1 hit)"));
+		QVERIFY(!text.contains("b.txt"));
+		// the main finder keeps its results
+		QVERIFY(finderText().contains("Search \"apple\""));
+
+		// the extra finders close (dock close button, or "Close this finder"); the main one cannot be removed
+		QPointer<Finder> watchSub = sub;
+		QVERIFY(sub->close());
+		QCOMPARE(dlg()->getFindersOfFinder().size(), size_t(1));
+		QTRY_VERIFY(watchSub.isNull());
+		QVERIFY(!dlg()->removeFinder(mainFinder));
+		QVERIFY(dlg()->removeFinder(sub2));
+		QVERIFY(dlg()->getFindersOfFinder().empty());
+	}
+
 	void smartHighlighting()
 	{
 		newDocument("value = value + other_value;\nvalue\n");

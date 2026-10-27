@@ -103,7 +103,8 @@ def num(arg):
 
 
 def cstr(s):
-    return 'L"' + s.replace('\\', '\\\\').replace('"', '\\"').replace('\\\\r', '\\r').replace('\\\\n', '\\n').replace('\\\\t', '\\t') + '"'
+    # RC strings use the C escapes already (\\n, \\t, \\\\); only a quote ("" in the .rc) needs one
+    return 'L"' + s.replace('"', '\\"') + '"'
 
 
 def parse_dialog(lines, start):

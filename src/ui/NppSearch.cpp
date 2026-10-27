@@ -195,6 +195,39 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 			return findInProjects();
 		}
 
+		case WM_FINDALL_INCURRENTFINDER:
+		{
+			FindersInfo *findInFolderInfo = reinterpret_cast<FindersInfo *>(wParam);
+			Finder * newFinder = _findReplaceDlg->createFinder();
+
+			findInFolderInfo->_pDestFinder = newFinder;
+			bool isOK = findInFinderFiles(findInFolderInfo);
+			return isOK;
+		}
+
+		case NPPM_INTERNAL_FINDINFINDERDLG:
+		{
+			Finder *launcher = reinterpret_cast<Finder *>(wParam);
+
+			if (!_findInFinderDlg)
+			{
+				_findInFinderDlg = new FindInFinderDlg(this);
+				_findInFinderDlg->init([this](unsigned int msg, uptr_t w, sptr_t l) { return nppMessage(msg, w, l); });
+			}
+
+			// NPLX: upstream then calls _findReplaceDlg.setSearchTextWithSettings() and setFindReplaceFolderFilter()
+			// after its modal dialog returned; they only refill the Find dialog, which this dialog does not use
+			_findInFinderDlg->doDialog(launcher, _nativeLangSpeaker.isRTL()); // translated when created
+			return TRUE;
+		}
+
+		case NPPM_INTERNAL_REMOVEFINDER:
+		{
+			// NPLX: a volatile finder closed itself (upstream hides it with NPPM_DMMHIDE and keeps it)
+			_findReplaceDlg->removeFinder(reinterpret_cast<Finder*>(lParam));
+			return TRUE;
+		}
+
 		case WM_REPLACEINPROJECTS:
 		{
 			return replaceInProjects();
@@ -859,6 +892,91 @@ bool Notepad_plus::findInFiles()
 		return false;
 
 	return findInFilelist(fileNames);
+}
+
+bool Notepad_plus::findInFinderFiles(FindersInfo *findInFolderInfo)
+{
+	int nbTotal = 0;
+	ScintillaEditView *pOldView = _pEditView;
+	_pEditView = _invisibleEditView;
+	Document oldDoc = _invisibleEditView->execute(SCI_GETDOCPOINTER);
+
+	vector<wstring> fileNames = findInFolderInfo->_pSourceFinder->getResultFilePaths(false);
+
+	findInFolderInfo->_pDestFinder->beginNewFilesSearch();
+	findInFolderInfo->_pDestFinder->addSearchLine(findInFolderInfo->_findOption._str2Search.c_str());
+
+	Progress progress(this);
+
+	size_t filesCount = fileNames.size();
+
+	if (filesCount > 1)
+	{
+		wstring msg = _nativeLangSpeaker.getLocalizedStrFromID("find-in-files-progress-title", L"Find In Files progress...");
+		progress.open(_findReplaceDlg, msg.c_str());
+	}
+
+	NppParameters& nppParam = NppParameters::getInstance();
+	const NppGUI& nppGui = nppParam.getNppGUI();
+
+	Document scratchDoc = MainFileManager.createSearchDocument();
+	MatchedFileNameProgress progressUi(progress);
+
+	for (size_t i = 0; i < filesCount; ++i)
+	{
+		if (progress.isCancelled()) break;
+
+		const wchar_t* filePath = fileNames.at(i).c_str();
+		findInFolderInfo->_pFileName = filePath;
+
+		BufferID id = nppGui._fif_ignoreunsavedChangesInOpenedFiles ? BUFFER_INVALID : MainFileManager.getBufferFromName(filePath);
+
+		int nb = 0;
+		if (id != BUFFER_INVALID)
+		{
+			Buffer * pBuf = MainFileManager.getBufferByID(id);
+			_invisibleEditView->execute(SCI_SETDOCPOINTER, 0, pBuf->getDocument());
+
+			setCodePageForInvisibleView(pBuf);
+
+			nb = _findReplaceDlg->processAll(ProcessFindInFinder, &(findInFolderInfo->_findOption), true, findInFolderInfo);
+		}
+		else if (scratchDoc)
+		{
+			if (_invisibleEditView->execute(SCI_GETDOCPOINTER) != scratchDoc)
+				_invisibleEditView->execute(SCI_SETDOCPOINTER, 0, scratchDoc);
+
+			SearchLoadResult loaded = MainFileManager.loadFileContentForSearch({ scratchDoc, filePath, -1, _invisibleEditView });
+			if (loaded._ok)
+			{
+				_invisibleEditView->execute(SCI_SETCODEPAGE, 0);
+				setCodePageForInvisibleView(loaded._unicodeMode);
+
+				nb = _findReplaceDlg->processAll(ProcessFindInFinder, &(findInFolderInfo->_findOption), true, findInFolderInfo);
+			}
+		}
+
+		if (nb == FIND_INVALID_REGULAR_EXPRESSION)
+			break;
+
+		nbTotal += nb;
+
+		if (progressUi.due())
+		{
+			progress.setPercent(int32_t((i * 100) / filesCount), filePath, nbTotal);
+			progressUi.noteUpdated();
+		}
+	}
+	progress.close();
+
+	const bool searchedInSelection = false;
+	findInFolderInfo->_pDestFinder->finishFilesSearch(nbTotal, int(filesCount), !searchedInSelection, &(findInFolderInfo->_findOption));
+
+	_invisibleEditView->execute(SCI_SETDOCPOINTER, 0, oldDoc);
+	MainFileManager.releaseSearchDocument(scratchDoc);
+	_pEditView = pOldView;
+
+	return true;
 }
 
 bool Notepad_plus::findInFilelist(std::vector<SearchCandidate> & fileNames)

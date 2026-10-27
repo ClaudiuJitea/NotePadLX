@@ -40,6 +40,7 @@
 #include "Notepad_plus_msgs.h"
 #include "Parameters.h"
 #include "ParentMessenger.h"
+#include "RcDialog.h"
 #include "ScintillaEditView.h"
 #include "resource.h"
 
@@ -190,6 +191,7 @@ public:
 protected:
 	bool notify(SCNotification *notification);
 	bool eventFilter(QObject* watched, QEvent* event) override;
+	void closeEvent(QCloseEvent* event) override; // NPLX: the dock's close button removes a volatile finder
 
 private:
 	enum { searchHeaderLevel = SC_FOLDLEVELBASE, fileHeaderLevel, resultLevel };
@@ -266,6 +268,35 @@ struct FindersInfo
 	const wchar_t *_pFileName = nullptr;
 
 	FindOption _findOption;
+};
+
+// NPLX: upstream StaticDialog built from IDD_FINDINFINDER_DLG (RcFindInFinder.inc). Upstream runs it as a modal
+// DialogBox; here it is an application-modal dialog that does not block the caller.
+class FindInFinderDlg : public RcDialog
+{
+	Q_OBJECT
+public:
+	explicit FindInFinderDlg(QWidget* parent = nullptr) : RcDialog(parent) {
+		_options._isMatchCase = false;
+		_options._isWholeWord = false;
+		_options._isMatchLineNumber = true;
+	}
+
+	void init(ParentMessenger sendToParent) { _sendToParent = std::move(sendToParent); } // NPLX: upstream _hParent
+	void doDialog(Finder *launcher, bool isRTL = false);
+	FindOption & getOption() { return _options; }
+
+protected:
+	void onCommand(int id, int notification) override; // upstream run_dlgProc WM_COMMAND
+	void reject() override { onCommand(IDCANCEL, RcNotifyClicked); }
+
+private:
+	Finder  *_pFinder2Search = nullptr;
+	FindOption _options;
+	ParentMessenger _sendToParent;
+
+	void initFromOptions();
+	void writeOptions();
 };
 
 class FindReplaceDlg : public QDialog

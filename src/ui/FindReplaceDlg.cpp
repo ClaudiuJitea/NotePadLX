@@ -31,6 +31,7 @@
 #include <QButtonGroup>
 #include <QCheckBox>
 #include <QClipboard>
+#include <QCloseEvent>
 #include <QComboBox>
 #include <QContextMenuEvent>
 #include <QFileDialog>
@@ -41,6 +42,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QLineEdit>
+#include <QMainWindow>
 #include <QMenu>
 #include <QPushButton>
 #include <QRadioButton>
@@ -304,6 +306,13 @@ void Finder::init(ScintillaEditView** ppEditView, ParentMessenger sendToParent)
 {
 	_ppEditView = ppEditView;
 	_sendToParent = std::move(sendToParent);
+}
+
+void Finder::closeEvent(QCloseEvent* event)
+{
+	QDockWidget::closeEvent(event);
+	if (_canBeVolatiled && event->isAccepted())
+		runCommand(NPPM_INTERNAL_REMOVEFINDER);
 }
 
 void Finder::display(bool toShow)
@@ -1347,13 +1356,14 @@ void Finder::runCommand(int cmd)
 	switch (cmd)
 	{
 		case NPPM_INTERNAL_FINDINFINDERDLG:
-			// NPLX_TODO(Phase 4): FindInFinderDlg
+			_sendToParent(NPPM_INTERNAL_FINDINFINDERDLG, reinterpret_cast<uptr_t>(this), 0);
 			break;
 		case NPPM_INTERNAL_REMOVEFINDER:
 			if (_canBeVolatiled)
 			{
 				display(false);
-				deleteLater();
+				// NPLX: upstream setClosed(true); here the finder is deleted and forgotten by FindReplaceDlg
+				_sendToParent(NPPM_INTERNAL_REMOVEFINDER, 0, reinterpret_cast<sptr_t>(this));
 			}
 			break;
 		case NPPM_INTERNAL_SCINTILLAFINDERCOLLAPSE :
@@ -1417,9 +1427,7 @@ void Finder::showContextMenu(const QPoint& globalPos)
 		return action;
 	};
 
-	QAction* findInFinderAction = add(NPPM_INTERNAL_FINDINFINDERDLG, findInFinder);
-	findInFinderAction->setEnabled(false);
-	findInFinderAction->setToolTip(QStringLiteral("Not yet ported"));
+	add(NPPM_INTERNAL_FINDINFINDERDLG, findInFinder);
 	if (_canBeVolatiled)
 		add(NPPM_INTERNAL_REMOVEFINDER, closeThis);
 	menu.addSeparator();
@@ -2475,10 +2483,196 @@ void FindReplaceDlg::findAllIn(InWhat op)
 		ctrl(IDD_FINDINFILES_DIR_COMBO)->setFocus();
 }
 
+// ============================================================================
+// FindInFinderDlg (Find in these search results...)
+// ============================================================================
+
+namespace
+{
+#include "RcFindInFinder.inc"
+}
+
+void FindInFinderDlg::initFromOptions()
+{
+	QComboBox* hFindCombo = comboBox(IDFINDWHAT_FIFOLDER);
+	addText2Combo(_options._str2Search.c_str(), hFindCombo);
+
+	setChecked(IDC_MATCHLINENUM_CHECK_FIFOLDER, _options._isMatchLineNumber);
+
+	setChecked(IDWHOLEWORD_FIFOLDER, _options._searchType != FindRegex && _options._isWholeWord);
+	enableItem(IDWHOLEWORD_FIFOLDER, _options._searchType != FindRegex);
+
+	setChecked(IDMATCHCASE_FIFOLDER, _options._isMatchCase);
+
+	setChecked(IDNORMAL_FIFOLDER, _options._searchType == FindNormal);
+	setChecked(IDEXTENDED_FIFOLDER, _options._searchType == FindExtended);
+	setChecked(IDREGEXP_FIFOLDER, _options._searchType == FindRegex);
+
+	setChecked(IDREDOTMATCHNL_FIFOLDER, _options._dotMatchesNewline);
+	enableItem(IDREDOTMATCHNL_FIFOLDER, _options._searchType == FindRegex);
+}
+
+void FindInFinderDlg::writeOptions()
+{
+	QComboBox* hFindCombo = comboBox(IDFINDWHAT_FIFOLDER);
+	_options._str2Search = getTextFromCombo(hFindCombo);
+	_options._isMatchLineNumber = isCheckedOrNot(IDC_MATCHLINENUM_CHECK_FIFOLDER);
+	_options._isWholeWord = isCheckedOrNot(IDWHOLEWORD_FIFOLDER);
+	_options._isMatchCase = isCheckedOrNot(IDMATCHCASE_FIFOLDER);
+	_options._searchType = isCheckedOrNot(IDREGEXP_FIFOLDER) ? FindRegex : isCheckedOrNot(IDEXTENDED_FIFOLDER) ? FindExtended : FindNormal;
+	_options._dotMatchesNewline = isCheckedOrNot(IDREDOTMATCHNL_FIFOLDER);
+}
+
+void FindInFinderDlg::doDialog(Finder *launcher, bool isRTL)
+{
+	_pFinder2Search = launcher;
+
+	// upstream WM_INITDIALOG (the dialog is created again each time)
+	if (!isCreated())
+	{
+		buildFrom(IDD_FINDINFINDER_DLG_def);
+		setModal(true);
+		nplx::changeDlgLang(*this, "FindInFinder");
+	}
+	setLayoutDirection(isRTL ? Qt::RightToLeft : Qt::LeftToRight);
+
+	const bool wasUpdating = _isUpdatingControls;
+	_isUpdatingControls = true;
+	initFromOptions();
+	_isUpdatingControls = wasUpdating;
+
+	show();
+	raise();
+	activateWindow();
+	if (QComboBox* hFindCombo = comboBox(IDFINDWHAT_FIFOLDER))
+	{
+		hFindCombo->setFocus();
+		if (hFindCombo->lineEdit())
+			hFindCombo->lineEdit()->selectAll();
+	}
+}
+
+void FindInFinderDlg::onCommand(int id, int notification)
+{
+	if (notification != RcNotifyClicked)
+		return;
+
+	switch (id)
+	{
+		case IDCANCEL:
+		{
+			hide(); // upstream ::EndDialog(_hSelf, -1)
+			return;
+		}
+
+		case IDOK:
+		{
+			writeOptions();
+			hide(); // upstream ::EndDialog(_hSelf, -1)
+			FindersInfo findersInfo;
+			findersInfo._pSourceFinder = _pFinder2Search;
+			findersInfo._findOption = _options;
+			_sendToParent(WM_FINDALL_INCURRENTFINDER, reinterpret_cast<uptr_t>(&findersInfo), 0);
+			return;
+		}
+
+		case IDNORMAL_FIFOLDER:
+		case IDEXTENDED_FIFOLDER:
+		case IDREGEXP_FIFOLDER:
+		{
+			if (isCheckedOrNot(IDREGEXP_FIFOLDER))
+			{
+				enableItem(IDWHOLEWORD_FIFOLDER, false);
+				setChecked(IDWHOLEWORD_FIFOLDER, false);
+				enableItem(IDREDOTMATCHNL_FIFOLDER, true);
+			}
+			else if (isCheckedOrNot(IDEXTENDED_FIFOLDER))
+			{
+				enableItem(IDWHOLEWORD_FIFOLDER, true);
+				enableItem(IDREDOTMATCHNL_FIFOLDER, false);
+			}
+			else
+			{
+				// normal mode
+				enableItem(IDWHOLEWORD_FIFOLDER, true);
+				enableItem(IDREDOTMATCHNL_FIFOLDER, false);
+			}
+			return;
+		}
+
+		default:
+			return;
+	}
+}
+
 Finder* FindReplaceDlg::createFinder()
 {
-	// NPLX_TODO(Phase 4): FindInFinderDlg creates additional finders (upstream WM_FINDALL_INCURRENTFINDER)
-	return nullptr;
+	NppParameters& nppParam = NppParameters::getInstance();
+
+	Finder* pFinder = new Finder(parentWidget());
+	pFinder->init(_ppEditView, _sendToParent);
+	// NPLX: a name of its own, so that the dock layout saved at exit (which only keeps the main finder) ignores it
+	pFinder->setObjectName(QStringLiteral("SearchResults_%1").arg(_findersOfFinder.size() + 1));
+
+	bool isRTL = _pFinder && _pFinder->_scintView->isTextDirectionRTL();
+
+	NativeLangSpeaker *pNativeSpeaker = nppParam.getNativeLangSpeaker();
+	wstring text = pNativeSpeaker ? pNativeSpeaker->getLocalizedStrFromID("find-result-caption", L"") : wstring();
+	if (!text.empty())
+		_findResTitle = text;
+	pFinder->setWindowTitle(QString::fromStdWString(_findResTitle.empty() ? std::wstring(L"Search results") : _findResTitle));
+
+	// upstream: NPPM_DMMREGASDCKDLG with DWS_DF_CONT_BOTTOM; NPLX: in the tab group of the main finder
+	_sendToParent(NPPM_DMMREGASDCKDLG, 0, reinterpret_cast<sptr_t>(pFinder));
+	if (_pFinder)
+	{
+		if (auto* mainWindow = qobject_cast<QMainWindow*>(parentWidget()); mainWindow && !_pFinder->isFloating())
+			mainWindow->tabifyDockWidget(_pFinder, pFinder);
+	}
+
+	if (isRTL)
+		pFinder->_scintView->changeTextDirection(true);
+
+	pFinder->setFinderReadOnly(true);
+	pFinder->_scintView->execute(SCI_SETCODEPAGE, SC_CP_UTF8);
+	pFinder->_scintView->execute(SCI_USEPOPUP, SC_POPUP_NEVER);
+	pFinder->_scintView->execute(SCI_SETMODEVENTMASK, MODEVENTMASK_OFF); // Turn off the modification event
+	pFinder->_scintView->execute(SCI_SETUNDOCOLLECTION, false);	//don't store any undo information
+	pFinder->_scintView->execute(SCI_SETCARETWIDTH, 1);
+	pFinder->_scintView->showMargin(ScintillaEditView::_SC_MARGE_FOLDER, true);
+
+	pFinder->_scintView->execute(SCI_SETUSETABS, true);
+	pFinder->_scintView->execute(SCI_SETTABWIDTH, 4);
+
+	// inherit setting from current state of main finder:
+	pFinder->_longLinesAreWrapped = _pFinder ? _pFinder->_longLinesAreWrapped : false;
+	pFinder->_scintView->wrap(pFinder->_longLinesAreWrapped);
+	pFinder->_scintView->setWrapMode(LINEWRAP_INDENT);
+	pFinder->_scintView->showWrapSymbol(true);
+
+	// allow user to start selecting as a stream block, then switch to a column block by adding Alt keypress
+	pFinder->_scintView->execute(SCI_SETMOUSESELECTIONRECTANGULARSWITCH, true);
+
+	// overwrite some default settings
+	pFinder->_scintView->showMargin(ScintillaEditView::_SC_MARGE_SYMBOL, false);
+	pFinder->_scintView->showMargin(ScintillaEditView::_SC_MARGE_LINENUMBER, false); // NPLX: init() shows it
+	pFinder->_scintView->setMakerStyle(FOLDER_STYLE_SIMPLE);
+
+	pFinder->setFinderStyle();
+	pFinder->setFinderStyleForNpc();
+
+	pFinder->display();
+
+	// Send the address of _MarkingsStruct to the lexer
+	char ptrword[sizeof(void*) * 2 + 3];
+	snprintf(ptrword, sizeof(ptrword), "%p", static_cast<void*>(&pFinder->_markingsStruct));
+	pFinder->_scintView->execute(SCI_SETPROPERTY, reinterpret_cast<WPARAM>("@MarkingsStruct"), reinterpret_cast<LPARAM>(ptrword));
+
+	_findersOfFinder.push_back(pFinder);
+
+	pFinder->_scintView->setFocus();
+
+	return pFinder;
 }
 
 bool FindReplaceDlg::removeFinder(Finder *finder2remove)
@@ -2487,6 +2681,10 @@ bool FindReplaceDlg::removeFinder(Finder *finder2remove)
 	{
 		if (*i == finder2remove)
 		{
+			// NPLX: upstream keeps closed finders; deleted here, so their view gives its default buffer back first
+			// (a buffer left with a dangling referee breaks FileManager::nextUntitledNewNumber)
+			ScintillaEditView* view = finder2remove->_scintView;
+			MainFileManager.closeBuffer(view->getCurrentBufferID(), view);
 			finder2remove->deleteLater();
 			_findersOfFinder.erase(i);
 			return true;

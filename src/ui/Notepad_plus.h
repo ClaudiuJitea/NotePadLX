@@ -75,6 +75,8 @@ class RunMacroDlg;
 class HashFromFilesDlg;
 class ColumnEditorDlg;
 class FindCharsInRangeDlg;
+class FindInFinderDlg;
+struct FindersInfo;
 class AboutDlg;
 class DebugInfoDlg;
 class CmdLineArgsDlg;
@@ -333,6 +335,7 @@ public:
 	RunMacroDlg* getRunMacroDlg() const { return _runMacroDlg; } // NPLX: tests
 	ColumnEditorDlg* getColumnEditorDlg() const { return _colEditorDlg; } // NPLX: tests
 	FindCharsInRangeDlg* getFindCharsInRangeDlg() const { return _findCharsInRangeDlg; } // NPLX: tests
+	FindInFinderDlg* getFindInFinderDlg() const { return _findInFinderDlg; } // NPLX: tests
 	AboutDlg* getAboutDlg() const { return _aboutDlg; } // NPLX: tests
 	DebugInfoDlg* getDebugInfoDlg() const { return _debugInfoDlg; } // NPLX: tests
 	CmdLineArgsDlg* getCmdLineArgsDlg() const { return _cmdLineArgsDlg; } // NPLX: tests
@@ -357,6 +360,7 @@ public:
 	bool findInOpenedFiles();
 	bool findInFiles();
 	bool findInFilelist(std::vector<SearchCandidate>& fileNames);
+	bool findInFinderFiles(FindersInfo* findInFolderInfo);
 	bool replaceInOpenedFiles();
 	bool replaceInFiles();
 	bool replaceInFilelist(std::vector<std::wstring>& fileNames);
@@ -512,6 +516,7 @@ private:
 	// upstream _md5FromFilesDlg, _md5FromTextDlg, _sha1From..., _sha2From..., _sha512From... (created on first use)
 	ColumnEditorDlg* _colEditorDlg = nullptr; // upstream _colEditorDlg (created on first use)
 	FindCharsInRangeDlg* _findCharsInRangeDlg = nullptr; // upstream _findCharsInRangeDlg (created on first use)
+	FindInFinderDlg* _findInFinderDlg = nullptr; // upstream _findInFinderDlg (created on first use)
 	AboutDlg* _aboutDlg = nullptr;
 	DebugInfoDlg* _debugInfoDlg = nullptr;
 	CmdLineArgsDlg* _cmdLineArgsDlg = nullptr;
