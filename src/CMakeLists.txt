@@ -202,14 +202,13 @@ string(STRIP "${NPLX_LEXILLA_VERSION}" NPLX_LEXILLA_VERSION)
 target_compile_definitions(nplx_ui PUBLIC NPLX_HOMEPAGE_URL="${PROJECT_HOMEPAGE_URL}" NPLX_VERSION="${PROJECT_VERSION}"
     NPLX_SCINTILLA_VERSION="${NPLX_SCINTILLA_VERSION}" NPLX_LEXILLA_VERSION="${NPLX_LEXILLA_VERSION}")
 
-# Resources: application icon (:/icons/...) and upstream icons (:/npp/tabbar, :/npp/toolbar-*)
+# Resources: application icon (:/icons/...)
 file(GLOB NPLX_APP_ICONS CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/resources/icons/notepadlx-*.png)
 list(FILTER NPLX_APP_ICONS EXCLUDE REGEX "1024")
-file(GLOB NPLX_NPP_ICONS CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/resources/npp/*/*.ico)
 # NotePadLX icons (SVG templates, see resources/nplx-icons/README.md); rendered by the qt6-svg image format plugin
 file(GLOB NPLX_SVG_ICONS CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/resources/nplx-icons/*.svg)
 qt_add_resources(nplx_ui "nplx_icons" PREFIX "/" BASE ${PROJECT_SOURCE_DIR}/resources
-    FILES ${NPLX_APP_ICONS} ${NPLX_NPP_ICONS} ${NPLX_SVG_ICONS})
+    FILES ${NPLX_APP_ICONS} ${NPLX_SVG_ICONS})
 
 # Application
 add_executable(notepadlx

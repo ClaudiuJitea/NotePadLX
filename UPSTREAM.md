@@ -6,7 +6,7 @@ NotePadLX is ported from Notepad++. The upstream mirror lives (read‑only) in
 | Component | Upstream | Version | Vendored to |
 |---|---|---|---|
 | Notepad++ | `notepad-plus-plus/` | commit `cda2acf54` (2026‑10‑23, "Fix initially hidden WindowsDlg listview item selected") | ported progressively into `src/` |
-| Scintilla | `notepad-plus-plus/scintilla/` (**N++‑patched**) | 5.6.6 | `third_party/scintilla/` (`include/`, `src/`, `call/`, `qt/ScintillaEditBase/`) |
+| Scintilla | `notepad-plus-plus/scintilla/` (**N++‑patched**) | 5.6.6 | `third_party/scintilla/` (`include/`, `src/`, `qt/ScintillaEditBase/`) |
 | Lexilla | `notepad-plus-plus/lexilla/` (**N++‑patched**, plus `LexUser`, `LexSearchResult`, `LexObjC`) | 5.5.3 | `third_party/lexilla/` (`include/`, `lexlib/`, `lexers/`, `src/Lexilla.cxx`) |
 | Boost.Regex search | `notepad-plus-plus/boostregex/` (header‑only Boost.Regex v5, standalone) | as in N++ | `third_party/boostregex/` |
 
@@ -26,7 +26,7 @@ Find them by diffing against the pristine releases in
   and the added `include/BoostRegexSearch.h` (`SCI_GETBOOSTREGEXERRMSG` = 5000,
   `INDIC_EXPLORERLINK`, 32‑bit range APIs removed in favour of `*FULL`).
 - Lexilla: `lexlib/StyleContext.{h,cxx}`, `lexlib/WordList.h`, `src/Lexilla.cxx`
-  (registers the custom lexers), `include/{SciLexer.h, LexicalStyles.iface, Lexilla.h}`.
+  (registers the custom lexers), `include/{SciLexer.h, Lexilla.h}`.
 - `win32/ScintillaWin.cxx`: Boost regex error‑message hook, charset fix (#5671), and MinGW
   defines. **Only the regex hook applies on Qt and is ported; see below.**
 
