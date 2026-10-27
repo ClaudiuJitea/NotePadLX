@@ -101,6 +101,11 @@ void nplx::setCommandLine(const std::wstring& cmdLine)
 	g_commandLine = cmdLine;
 }
 
+const std::wstring& nplx::commandLine()
+{
+	return g_commandLine;
+}
+
 // ---- About
 
 AboutDlg::AboutDlg(std::function<void()> checkForUpdates, std::function<void()> debugInfo, QWidget* parent)
@@ -332,7 +337,9 @@ void DebugInfoDlg::refreshDebugInfo()
 	_debugInfoStr += L"Locale: " + q(QLocale::system().name()) + L"\n";
 
 	// Plugins
-	_debugInfoStr += L"Plugins: none\n"; // NPLX_TODO(Phase 9): the loaded plugins
+	_debugInfoStr += L"Plugins: ";
+	_debugInfoStr += _loadedPlugins.length() == 0 ? L"none" : _loadedPlugins;
+	_debugInfoStr += L"\n";
 
 	_edit->setPlainText(QString::fromStdWString(_debugInfoStr));
 }

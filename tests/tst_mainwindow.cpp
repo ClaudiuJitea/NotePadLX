@@ -146,11 +146,12 @@ private slots:
 		QVERIFY(action(IDM_FILE_SAVE)->isEnabled() == false); // nothing to save yet
 		QVERIFY(action(IDM_LANG_CPP));
 
-		// A command that is not ported is disabled, not silently missing
-		QVERIFY(!Notepad_plus::isCommandPorted(IDM_SETTING_IMPORTPLUGIN));
+		// 1.0: every menu command is ported (an unported one would be disabled with a tooltip, not missing)
+		QVERIFY(Notepad_plus::isCommandPorted(IDM_SETTING_IMPORTPLUGIN));
 		QVERIFY(action(IDM_SETTING_IMPORTPLUGIN));
-		QVERIFY(!action(IDM_SETTING_IMPORTPLUGIN)->isEnabled());
-		QCOMPARE(action(IDM_SETTING_IMPORTPLUGIN)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
+		QVERIFY(action(IDM_SETTING_IMPORTPLUGIN)->isEnabled());
+		for (QAction* a : _npp->menuBar()->findChildren<QAction*>())
+			QVERIFY2(a->toolTip() != QStringLiteral("Not yet ported to NotePadLX"), qPrintable(a->text()));
 	}
 
 	void windowsOnlyItemsAreRemoved()

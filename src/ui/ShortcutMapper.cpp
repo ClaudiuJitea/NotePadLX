@@ -844,7 +844,9 @@ void ShortcutMapper::onCommand(int id, int notification)
 					//Notify current Accelerator class to update everything
 					if (_host._updateShortcuts)
 						_host._updateShortcuts();
-					// NPLX_TODO(Phase 9): NPPM_INTERNAL_PLUGINSHORTCUTMODIFIED to the plugin
+					// upstream: NPPM_INTERNAL_PLUGINSHORTCUTMODIFIED with an empty ShortcutKey
+					if (_host._pluginShortcutModified)
+						_host._pluginShortcutModified(static_cast<int>(pcsc.getID()), KeyCombo{});
 					nppParam.setShortcutDirty();
 				}
 				break;
@@ -983,7 +985,8 @@ void ShortcutMapper::onCommand(int id, int notification)
 						//Notify current Accelerator class to update everything
 						if (_host._updateShortcuts)
 							_host._updateShortcuts();
-						// NPLX_TODO(Phase 9): NPPM_INTERNAL_PLUGINSHORTCUTMODIFIED to the plugin
+						if (_host._pluginShortcutModified)
+							_host._pluginShortcutModified(static_cast<int>(pcsc.getID()), pcsc.getKeyCombo());
 						nppParam.setShortcutDirty();
 					}
 				}

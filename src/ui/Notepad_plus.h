@@ -73,6 +73,9 @@ class NppMenu;
 class RunDlg;
 class RunMacroDlg;
 class HashFromFilesDlg;
+class PluginsManager;
+struct DockedWidgetData;
+struct PluginDlgDockingInfo;
 class ColumnEditorDlg;
 class FindCharsInRangeDlg;
 class FindInFinderDlg;
@@ -442,6 +445,22 @@ public:
 	bool isInTray() const;
 	QSystemTrayIcon* getTrayIcon() const { return _pTrayIco; } // NPLX: tests
 
+	// --- plugins (NppPlugins.cpp; upstream PluginsManager use in Notepad_plus.cpp and NppBigSwitch.cpp)
+	void setPluginsDisabled(bool isDisabled) { _isNoPlugin = isDisabled; } // -noPlugin; before init()
+	PluginsManager* pluginsManager() const;
+	// NppData::_nppSend: the messages of the plugins (the _UTF8 variants, the docking panels, then nppMessage)
+	intptr_t pluginMessage(unsigned int message, uptr_t wParam, sptr_t lParam);
+	ScintillaEditView* pluginScintilla(void* handle) const; // a Scintilla handle of NppData, or nullptr
+	void notifyPlugins(const SCNotification* notification); // upstream _pluginsManager.notify
+	void notifyPlugins(unsigned int code, const void* hwndFrom, uptr_t idFrom);
+	void notifyPluginsFromNpp(unsigned int code, uptr_t idFrom); // hwndFrom: the NotePadLX handle
+	void notifyReady(); // NPPN_READY, once the window is shown
+	void notifyCmdLinePluginMessage(const std::wstring& pluginMessage); // NPPN_CMDLINEPLUGINMSG
+	std::wstring getLoadedPluginNames() const;
+	std::vector<std::wstring> addNppPlugins(const wchar_t *extFilterName, const wchar_t *extFilter);
+	bool fileSaveSpecific(const std::wstring& fileNameToSave);
+	bool fileRenameUntitledPluginAPI(BufferID id, const wchar_t* tabNewName);
+
 protected:
 	bool eventFilter(QObject* watched, QEvent* event) override;
 	void closeEvent(QCloseEvent* event) override;
@@ -585,4 +604,41 @@ private:
 	std::multimap<int, QAction*> _actions; // IDM_* -> menu actions (an id can appear in several menus)
 	std::map<int, QAction*> _hiddenShortcutActions; // NPLX: the shortcuts of the commands without a menu item
 	std::map<int, QAction*> _langActions;
+
+	// NPLX: the plugin host (NppPlugins.cpp)
+	struct PluginPanel
+	{
+		DockingPanel* _panel = nullptr;
+		QWidget* _client = nullptr;
+		std::wstring _moduleName;
+		QString _name;
+		int _dlgID = 0;
+		const char* _addInfo = nullptr; // the plugin's string, read again on NPPM_DMMUPDATEDISPINFO
+		unsigned int _mask = 0;
+	};
+	struct PluginToolbarIcon
+	{
+		int _cmdID = 0;
+		QString _icon;
+		QString _iconDarkMode;
+	};
+	void initPlugins();
+	bool pluginApiMessage(unsigned int message, uptr_t wParam, sptr_t lParam, intptr_t& result);
+	intptr_t utf8PluginMessage(unsigned int message, uptr_t wParam, sptr_t lParam);
+	bool registerPluginPanel(const DockedWidgetData* pData);
+	PluginPanel* findPluginPanel(const QWidget* client);
+	void updatePluginPanelTitle(PluginPanel& p);
+	void savePluginDockingParams(std::vector<PluginDlgDockingInfo>& infos) const;
+	void loadPluginDockingParams();
+	void addPluginToolbarButtons();
+	void updatePluginToolbarIcons();
+	void openPluginsFolder();
+	std::unique_ptr<PluginsManager> _pluginsManager;
+	std::unique_ptr<QtNppMenu> _pluginsMenuHandle; // NppMenu view of the Plugins menu, for contextMenu.xml
+	void detachPluginHost();
+	bool _isNoPlugin = false;
+	std::vector<std::unique_ptr<PluginPanel>> _pluginPanels;
+	std::vector<std::unique_ptr<PluginToolbarIcon>> _pluginToolbarIcons;
+	std::vector<ScintillaEditView*> _scintillaCtrls4Plugins; // upstream ScintillaCtrls _scintillaCtrls4Plugins
+	std::vector<sptr_t> _hModelessDlgs; // upstream NPPM_MODELESSDIALOG
 };

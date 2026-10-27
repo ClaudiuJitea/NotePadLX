@@ -153,9 +153,12 @@ private slots:
 			QVERIFY2(action(id), qPrintable(QString::number(id)));
 			QVERIFY2(action(id)->isEnabled(), qPrintable(QString::number(id)));
 		}
-		// still disabled with a tooltip
-		QVERIFY(!action(IDM_SETTING_IMPORTPLUGIN)->isEnabled());
-		QCOMPARE(action(IDM_SETTING_IMPORTPLUGIN)->toolTip(), QStringLiteral("Not yet ported to NotePadLX"));
+		// Phase 9: the plugin commands of the Settings and Plugins menus
+		for (int id : { IDM_SETTING_IMPORTPLUGIN, IDM_SETTING_OPENPLUGINSDIR })
+		{
+			QVERIFY2(action(id) && action(id)->isEnabled(), qPrintable(QString::number(id)));
+			QVERIFY(action(id)->toolTip() != QStringLiteral("Not yet ported to NotePadLX"));
+		}
 	}
 
 	void sortLines()

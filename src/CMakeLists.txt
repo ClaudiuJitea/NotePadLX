@@ -169,6 +169,12 @@ add_library(nplx_ui STATIC
     ui/RcPreference.inc
     ui/ShortcutDlg.h
     ui/shortcutRc.h
+    ui/NppPlugins.cpp
+    plugins/PluginsManager.cpp
+    plugins/PluginsManager.h
+    plugins/PluginInterface.h
+    plugins/PluginDockingQt.h
+    plugins/IDAllocator.h
 )
 set_target_properties(nplx_ui PROPERTIES AUTOMOC ON)
 
@@ -183,8 +189,11 @@ add_custom_command(
     VERBATIM)
 target_sources(nplx_ui PRIVATE ${NPLX_PORTED_COMMANDS_INC})
 target_include_directories(nplx_ui PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/generated)
-target_include_directories(nplx_ui PUBLIC ui)
-target_link_libraries(nplx_ui PUBLIC nplx_editor Qt6::Widgets Qt6::DBus Qt6::Network Qt6::PrintSupport)
+target_include_directories(nplx_ui PUBLIC ui plugins)
+target_link_libraries(nplx_ui PUBLIC nplx_editor Qt6::Widgets Qt6::DBus Qt6::Network Qt6::PrintSupport ${CMAKE_DL_LIBS})
+# Plugins: <libdir>/notepadlx/plugins/<Name>/<Name>.so (and the user's $XDG_DATA_HOME/notepadlx/plugins)
+include(GNUInstallDirs)
+target_compile_definitions(nplx_ui PRIVATE NPLX_SYSTEM_PLUGIN_DIR="${CMAKE_INSTALL_FULL_LIBDIR}/notepadlx/plugins")
 target_compile_options(nplx_ui PRIVATE ${NPLX_WARNINGS})
 file(READ ${PROJECT_SOURCE_DIR}/third_party/scintilla/version.txt NPLX_SCINTILLA_VERSION)
 file(READ ${PROJECT_SOURCE_DIR}/third_party/lexilla/version.txt NPLX_LEXILLA_VERSION)
@@ -217,6 +226,17 @@ target_compile_options(notepadlx PRIVATE ${NPLX_WARNINGS})
 
 include(GNUInstallDirs)
 install(TARGETS notepadlx RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+# the plugin SDK: the headers a plugin includes (see docs/PLUGINS.md)
+install(FILES
+    plugins/PluginInterface.h
+    plugins/PluginDockingQt.h
+    core/Notepad_plus_msgs.h
+    core/DockingCont.h
+    core/menuCmdID.h
+    core/platform/win32compat.h
+    ${PROJECT_SOURCE_DIR}/third_party/scintilla/include/Scintilla.h
+    ${PROJECT_SOURCE_DIR}/third_party/scintilla/include/Sci_Position.h
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/notepadlx)
 install(DIRECTORY ${PROJECT_SOURCE_DIR}/data/ DESTINATION ${CMAKE_INSTALL_DATADIR}/notepadlx)
 install(FILES ${PROJECT_SOURCE_DIR}/packaging/notepadlx.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 install(FILES ${PROJECT_SOURCE_DIR}/packaging/io.github.ClaudiuJitea.NotePadLX.metainfo.xml DESTINATION ${CMAKE_INSTALL_DATADIR}/metainfo)

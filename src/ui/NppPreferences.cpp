@@ -229,6 +229,7 @@ void Notepad_plus::refreshDarkMode(bool resetStyle)
 		auto& nppGUITbInfo = nppParams.getNppGUI()._tbIconInfo;
 		nppGUITbInfo = NppDarkMode::getToolbarIconInfo();
 		applyToolbarIconSet();
+		updatePluginToolbarIcons(); // NPLX: the dark mode icon of the plugin buttons
 
 		// the editor theme of the mode (DarkMode darkThemeName / lightThemeName)
 		ThemeSwitcher& themeSwitcher = nppParams.getThemeSwitcher();
@@ -303,7 +304,8 @@ bool Notepad_plus::preferenceMessage(unsigned int message, uptr_t wParam, sptr_t
 		case NPPM_INTERNAL_REFRESHDARKMODE:
 		{
 			refreshDarkMode(static_cast<bool>(wParam));
-			// NPLX_TODO(Phase 9): notify the plugins (NPPN_DARKMODECHANGED)
+			// Notify plugins that Dark Mode changed
+			notifyPluginsFromNpp(NPPN_DARKMODECHANGED, 0);
 			return true;
 		}
 
@@ -324,6 +326,10 @@ bool Notepad_plus::preferenceMessage(unsigned int message, uptr_t wParam, sptr_t
 		case NPPM_INTERNAL_RELOADNATIVELANG:
 		{
 			reloadLang();
+
+			bool doNotif = wParam;
+			if (doNotif)
+				notifyPluginsFromNpp(NPPN_NATIVELANGCHANGED, 0);
 			return true;
 		}
 
@@ -891,6 +897,8 @@ bool Notepad_plus::preferenceMessage(unsigned int message, uptr_t wParam, sptr_t
 				(message == NPPM_INTERNAL_TOOLBARENLARGESET2) ? TB_LARGE2 : TB_STANDARD;
 			nppParam.getNppGUI()._tbIconInfo._tbIconSet = state;
 			applyToolbarIconSet();
+			// upstream NPPM_INTERNAL_TOOLBARICONSCHANGED: Notify plugins that toolbar icons have changed
+			notifyPluginsFromNpp(NPPN_TOOLBARICONSETCHANGED, static_cast<uptr_t>(state));
 			return true;
 		}
 

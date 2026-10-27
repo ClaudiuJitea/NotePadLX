@@ -54,6 +54,7 @@ namespace nplx
 
 	// the command line of this run, for Debug Info (upstream NPPM_GETCURRENTCMDLINE)
 	void setCommandLine(const std::wstring& cmdLine);
+	const std::wstring& commandLine();
 }
 
 class AboutDlg : public QDialog
@@ -72,12 +73,14 @@ class DebugInfoDlg : public QDialog
 
 public:
 	explicit DebugInfoDlg(QWidget* parent = nullptr);
+	void init(const std::wstring& loadedPlugins) { _loadedPlugins = loadedPlugins; } // upstream init(..., loadedPlugins)
 	void doDialog();
 	void refreshDebugInfo();
 	std::wstring debugInfo() const { return _debugInfoStr; } // NPLX: tests
 
 private:
 	std::wstring _debugInfoStr;
+	std::wstring _loadedPlugins;
 	QPlainTextEdit* _edit = nullptr;
 };
 

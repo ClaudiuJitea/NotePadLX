@@ -129,7 +129,9 @@ int main(int argc, char* argv[])
 	nppParameters.setFontList(fontNames);
 
 	Notepad_plus notepad_plus;
+	notepad_plus.setPluginsDisabled(cmdLineParams._isNoPlugin); // upstream _pluginsManager.disable()
 	notepad_plus.init();
+	notepad_plus.notifyCmdLinePluginMessage(cmdLineParams._pluginMessage); // upstream Notepad_plus_Window::init
 
 	// upstream Notepad_plus::init: restore the last session
 	if (nppGUI._rememberLastSession && !cmdLineParams._isNoSession)
@@ -171,10 +173,14 @@ int main(int argc, char* argv[])
 	else
 		notepad_plus.show();
 
+	// To notify plugins that all the procedures of launchment of notepad++ are done.
+	notepad_plus.notifyReady();
+
 	// Later launches send their files here (upstream: WM_COPYDATA COPYDATA_FILENAMESW)
 	if (!isMultiInst || nppGUI._multiInstSetting != multiInst)
 	{
 		singleInstance.listen([&notepad_plus](const std::vector<std::wstring>& files, const CmdLineParamsDTO& params) {
+			notepad_plus.notifyCmdLinePluginMessage(params._pluginMessage); // upstream WM_COPYDATA COPYDATA_PARAMS
 			notepad_plus.loadCommandlineParams(files, &params);
 			// upstream NPPM_INTERNAL_RESTOREFROMMINIMIZED: out of the tray, or restored
 			if (notepad_plus.isInTray())

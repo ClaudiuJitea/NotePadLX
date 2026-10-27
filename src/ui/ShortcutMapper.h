@@ -44,6 +44,7 @@ struct ShortcutMapperHost
 	std::function<void()> _updateShortcuts;        // nppParam.getAccelerator()->updateShortcuts()
 	std::function<void()> _updateScintillaKeys;    // nppParam.getScintillaAccelerator()->updateKeys()
 	std::function<bool(int cmdID)> _isRemovedCommand; // NPLX: a Windows-only command, not listed
+	std::function<void(int cmdID, const KeyCombo& key)> _pluginShortcutModified; // NPPM_INTERNAL_PLUGINSHORTCUTMODIFIED
 };
 
 class ShortcutMapper : public RcDialog {

@@ -16,7 +16,7 @@
 // along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 // NPLX: port of upstream NppIO.cpp (open / save / close). The Win32 file dialogs (CustomFileDialog)
-// are QFileDialog; NPPN_* plugin notifications come with the plugin host (Phase 9).
+// are QFileDialog.
 
 #include "Notepad_plus.h"
 #include "VerticalFileSwitcher.h"
@@ -213,6 +213,10 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 		}
 	}
 
+	// Notify plugins that current file is about to load
+	// Plugins can should use this notification to filter SCN_MODIFIED
+	notifyPluginsFromNpp(NPPN_FILEBEFORELOAD, 0);
+
 	if (encoding == -1)
 	{
 		encoding = getHtmlXmlEncoding(longFileName);
@@ -225,6 +229,9 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 
 		if (buffer != BUFFER_INVALID)
 		{
+			// To notify plugins that a snapshot dirty file is loaded on startup
+			notifyPlugins(NPPN_SNAPSHOTDIRTYFILELOADED, nullptr, reinterpret_cast<uptr_t>(buffer));
+
 			buffer->setLoadedDirty(true);
 		}
 	}
@@ -246,8 +253,15 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 		if (isReadOnly)
 			buf->setUserReadOnly(true);
 
+		// Notify plugins that current file is about to open
+		notifyPluginsFromNpp(NPPN_FILEBEFOREOPEN, reinterpret_cast<uptr_t>(buffer));
+
 		loadBufferIntoView(buffer, currentView());
 
+		_linkTriggered = true;
+
+		// Notify plugins that current file is just opened
+		notifyPluginsFromNpp(NPPN_FILEOPENED, reinterpret_cast<uptr_t>(buffer));
 		if (_pDocumentListPanel)
 			_pDocumentListPanel->newItem(buffer, currentView());
 	}
@@ -306,6 +320,8 @@ BufferID Notepad_plus::doOpen(const wstring& fileName, bool isRecursive, bool is
 				MB_OK,
 				0,
 				longFileName);
+
+			notifyPluginsFromNpp(NPPN_FILELOADFAILED, 0);
 		}
 	}
 	return buffer;
@@ -491,7 +507,14 @@ bool Notepad_plus::doSave(BufferID id, const wchar_t* filename, bool isCopy)
 		return false;
 	}
 
+	// Notify plugins that current file is about to be saved
+	if (!isCopy)
+		notifyPluginsFromNpp(NPPN_FILEBEFORESAVE, reinterpret_cast<uptr_t>(id));
+
 	SavingStatus res = MainFileManager.saveBuffer(id, filename, isCopy);
+
+	if (!isCopy)
+		notifyPluginsFromNpp(NPPN_FILESAVED, reinterpret_cast<uptr_t>(id));
 
 	if (res == SavingStatus::FullReadOnlySavingForbidden)
 	{
@@ -784,6 +807,9 @@ void Notepad_plus::doClose(BufferID id, int whichOne, bool doDeleteBackup)
 
 	Buffer* buf = MainFileManager.getBufferByID(id);
 
+	// Notify plugins that current file is about to be closed
+	notifyPluginsFromNpp(NPPN_FILEBEFORECLOSE, reinterpret_cast<uptr_t>(id));
+
 	// Add to recent file history only if file is removed from all the views
 	// There might be cases when file is cloned/moved to view.
 	// Don't add to recent list unless file is removed from all the views
@@ -821,8 +847,11 @@ void Notepad_plus::doClose(BufferID id, int whichOne, bool doDeleteBackup)
 	}
 	checkSyncState();
 
+	// Notify plugins that current file is closed
 	if (isBufRemoved)
 	{
+		notifyPluginsFromNpp(NPPN_FILECLOSED, reinterpret_cast<uptr_t>(id));
+
 		// The document could be cloned.
 		// if the same buffer ID is not found then remove the entry from File Switcher Panel
 		if (_pDocumentListPanel)
@@ -1078,6 +1107,93 @@ int Notepad_plus::doCloseOrNot(const wchar_t* fn)
 // Rename / Delete / Drop (NppIO.cpp, Notepad_plus.cpp)
 // ============================================================================
 
+bool Notepad_plus::fileSaveSpecific(const wstring& fileNameToSave)
+{
+	BufferID idToSave = _mainDocTab->findBufferByName(fileNameToSave.c_str());
+	if (idToSave == BUFFER_INVALID)
+	{
+		idToSave = _subDocTab->findBufferByName(fileNameToSave.c_str());
+	}
+	//do not use else syntax, id might be taken from sub doc tab,
+	//in which case fileSave needs to be executed also
+	if (idToSave != BUFFER_INVALID)
+	{
+		fileSave(idToSave);
+		checkDocState();
+		return true;
+	}
+	else
+	{
+		return false;
+	}
+}
+
+bool Notepad_plus::fileRenameUntitledPluginAPI(BufferID id, const wchar_t* tabNewName)
+{
+	if (tabNewName == nullptr) return false;
+
+	BufferID bufferID = id;
+	if (id == BUFFER_INVALID)
+	{
+		bufferID = _pEditView->getCurrentBufferID();
+	}
+
+	int bufferIndex = MainFileManager.getBufferIndexByID(bufferID);
+	if (bufferIndex == -1) return false;
+
+	Buffer* buf = MainFileManager.getBufferByIndex(bufferIndex);
+
+	if (buf == nullptr || !buf->isUntitled()) return false;
+
+	// We are just going to rename the tab nothing else
+	// So just rename the tab and rename the backup file too if applicable
+
+	std::wstring tabNewNameStr = tabNewName;
+
+	trim(tabNewNameStr); // No leading and trailing space allowed
+
+	if (tabNewNameStr.empty()) return false;
+
+	if (tabNewNameStr.length() > langNameLenMax - 1) return false;
+
+	// NPLX: the characters a Linux file name cannot hold (upstream filenameReservedChars: the Windows ones)
+	if (tabNewNameStr.find_first_of(L"/") != std::wstring::npos) return false;
+
+	BufferID sameNamedBufferId = _pDocTab->findBufferByName(tabNewNameStr.c_str());
+	if (sameNamedBufferId == BUFFER_INVALID)
+	{
+		sameNamedBufferId = _pNonDocTab->findBufferByName(tabNewNameStr.c_str());
+	}
+
+	if (sameNamedBufferId != BUFFER_INVALID) return false;
+
+	notifyPluginsFromNpp(NPPN_FILEBEFORERENAME, reinterpret_cast<uptr_t>(bufferID));
+
+	wstring oldName = buf->getFullPathName();
+	buf->setFileName(tabNewNameStr.c_str());
+
+	notifyPluginsFromNpp(NPPN_FILERENAMED, reinterpret_cast<uptr_t>(bufferID));
+
+	buf->setUntitledTabRenamedStatus(true);
+
+	bool isSnapshotMode = NppParameters::getInstance().getNppGUI().isSnapshotMode();
+	if (isSnapshotMode)
+	{
+		wstring oldBackUpFileName = buf->getBackupFileName();
+		if (oldBackUpFileName.empty())
+			return true;
+
+		wstring newBackUpFileName = oldBackUpFileName;
+		newBackUpFileName.replace(newBackUpFileName.rfind(oldName), oldName.length(), tabNewNameStr);
+
+		nplx::moveFileReplace(oldBackUpFileName, newBackUpFileName); // NPLX: was ReplaceFile / MoveFileEx
+
+		buf->setBackupFileName(newBackUpFileName);
+	}
+
+	return true;
+}
+
 bool Notepad_plus::fileRename(BufferID bufferID)
 {
 	if (bufferID == BUFFER_INVALID)
@@ -1096,7 +1212,9 @@ bool Notepad_plus::fileRename(BufferID bufferID)
 
 		if (!fn.isEmpty())
 		{
+			notifyPluginsFromNpp(NPPN_FILEBEFORERENAME, reinterpret_cast<uptr_t>(bufferID));
 			success = MainFileManager.moveFile(bufferID, fn.toStdWString().c_str());
+			notifyPluginsFromNpp(success ? NPPN_FILERENAMED : NPPN_FILERENAMECANCEL, reinterpret_cast<uptr_t>(bufferID));
 		}
 	}
 	else
@@ -1140,7 +1258,11 @@ bool Notepad_plus::fileRename(BufferID bufferID)
 			}
 			else // The change will be done here
 			{
+				notifyPluginsFromNpp(NPPN_FILEBEFORERENAME, reinterpret_cast<uptr_t>(bufferID));
+
 				buf->setFileName(tabNewNameStr.c_str());
+
+				notifyPluginsFromNpp(NPPN_FILERENAMED, reinterpret_cast<uptr_t>(bufferID));
 
 				success = true;
 				buf->setUntitledTabRenamedStatus(true);
@@ -1179,8 +1301,12 @@ bool Notepad_plus::fileDelete(BufferID id)
 
 	if (goAhead)
 	{
+		notifyPluginsFromNpp(NPPN_FILEBEFOREDELETE, reinterpret_cast<uptr_t>(bufferID));
+
 		if (!MainFileManager.deleteFile(bufferID))
 		{
+			notifyPluginsFromNpp(NPPN_FILEDELETEFAILED, reinterpret_cast<uptr_t>(bufferID));
+
 			_nativeLangSpeaker.messageBox("DeleteFileFailed",
 				L"Delete File failed",
 				L"Delete File",
@@ -1188,6 +1314,7 @@ bool Notepad_plus::fileDelete(BufferID id)
 
 			return false;
 		}
+		notifyPluginsFromNpp(NPPN_FILEDELETED, reinterpret_cast<uptr_t>(bufferID));
 		bool isSnapshotMode = NppParameters::getInstance().getNppGUI().isSnapshotMode();
 		doClose(bufferID, MAIN_VIEW, isSnapshotMode);
 		doClose(bufferID, SUB_VIEW, isSnapshotMode);
@@ -1744,13 +1871,15 @@ bool Notepad_plus::useFirstLineAsTabName(BufferID bufferID)
 
 	if (content1stLineTabName != buffer->getFileName() && sameNamedBufferId == BUFFER_INVALID)
 	{
-		// NPLX_TODO(Phase 9): notify the plugins (NPPN_FILEBEFORERENAME, NPPN_FILERENAMED)
+		notifyPluginsFromNpp(NPPN_FILEBEFORERENAME, reinterpret_cast<uptr_t>(buffer->getID()));
 
 		// backup old file path
 		wstring oldFileNamePath = buffer->getFullPathName();
 
 		// set tab name
 		buffer->setFileName(content1stLineTabName.c_str());
+
+		notifyPluginsFromNpp(NPPN_FILERENAMED, reinterpret_cast<uptr_t>(buffer->getID()));
 
 		// for the backup system
 		wstring oldBackUpFileName = buffer->getBackupFileName();

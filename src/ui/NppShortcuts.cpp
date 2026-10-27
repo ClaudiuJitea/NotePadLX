@@ -128,7 +128,19 @@ void Notepad_plus::updateShortcuts()
 		}
 	}
 	updateDynamicMenuShortcuts();
-	// NPLX_TODO(Phase 9): the plugin commands
+
+	// the plugin commands (their QActions are in _actions; the loop above cleared their keys)
+	for (const PluginCmdShortcut& pcsc : nppParam.getPluginCommandList())
+	{
+		const int id = static_cast<int>(pcsc.getID());
+		for (auto [it, end] = _actions.equal_range(id); it != end; ++it)
+		{
+			if (pcsc.isEnabled())
+				it->second->setShortcut(nplx::keyComboToKeySequence(pcsc.getKeyCombo()));
+			else
+				it->second->setShortcuts(QList<QKeySequence>());
+		}
+	}
 }
 
 void Notepad_plus::updateScintillaKeys()

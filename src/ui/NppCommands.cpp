@@ -21,6 +21,7 @@
 // Commands that are not ported yet are disabled in the menu (see isCommandPorted in Notepad_plus.cpp).
 
 #include "Notepad_plus.h"
+#include "PluginsManager.h"
 
 #include "RunDlg.h"
 #include "RunMacroDlg.h"
@@ -578,6 +579,15 @@ void Notepad_plus::command(int id)
 			host._updateShortcuts = [this]() { updateShortcuts(); };
 			host._updateScintillaKeys = [this]() { updateScintillaKeys(); };
 			host._isRemovedCommand = [](int cmdID) { return isRemovedOnLinux(cmdID); };
+			host._pluginShortcutModified = [this](int cmdID, const KeyCombo& key) {
+				// upstream NPPM_INTERNAL_PLUGINSHORTCUTMODIFIED: NPPN_SHORTCUTREMAPPED with the new ShortcutKey
+				ShortcutKey shortcut;
+				shortcut._isAlt = key._isAlt;
+				shortcut._isCtrl = key._isCtrl;
+				shortcut._isShift = key._isShift;
+				shortcut._key = key._key;
+				notifyPlugins(NPPN_SHORTCUTREMAPPED, &shortcut, static_cast<uptr_t>(cmdID));
+			};
 			shortcutMapper.init(std::move(host), st);
 			_pShortcutMapper = &shortcutMapper;
 			shortcutMapper.doDialog();
@@ -1588,7 +1598,10 @@ void Notepad_plus::command(int id)
 		case IDM_DEBUGINFO:
 		{
 			if (!_debugInfoDlg)
+			{
 				_debugInfoDlg = new DebugInfoDlg(this);
+				_debugInfoDlg->init(getLoadedPluginNames());
+			}
 			_debugInfoDlg->doDialog(); // translated when created
 			break;
 		}
@@ -2059,6 +2072,30 @@ void Notepad_plus::command(int id)
 					}
 				}
 			}
+			break;
+		}
+
+		case IDM_SETTING_IMPORTPLUGIN :
+		{
+			// Copy plugins to Plugins Home
+			const wchar_t *extFilterName = L"NotePadLX plugin";
+			const wchar_t *extFilter = L".so";
+			std::vector<std::wstring> copiedFiles = addNppPlugins(extFilterName, extFilter);
+
+			// Tell users to restart NotePadLX to load plugin
+			if (copiedFiles.size())
+			{
+				_nativeLangSpeaker.messageBox("NeedToRestartToLoadPlugins",
+					L"You have to restart NotePadLX to load plugins you installed.",
+					L"NotePadLX needs to be relaunched",
+					MB_OK | MB_APPLMODAL);
+			}
+			break;
+		}
+
+		case IDM_SETTING_OPENPLUGINSDIR:
+		{
+			openPluginsFolder();
 			break;
 		}
 
@@ -3431,7 +3468,9 @@ void Notepad_plus::command(int id)
 			{
 				_pDocumentListPanel->updateTabOrder();
 			}
-			// NPLX_TODO(Phase 9): NPPN_DOCORDERCHANGED for plugins
+			// Notify plugins that the document order changed (hwndFrom: the new index of the current document)
+			notifyPlugins(NPPN_DOCORDERCHANGED, reinterpret_cast<void*>(static_cast<intptr_t>(newTabIndex)),
+				reinterpret_cast<uptr_t>(_pEditView->getCurrentBufferID()));
 		}
 		break;
 
@@ -3514,6 +3553,17 @@ void Notepad_plus::command(int id)
 			if (((id >= ID_MACRO) && (id < ID_MACRO_LIMIT)) || ((id >= ID_USER_CMD) && (id < ID_USER_CMD_LIMIT))) // shortcuts.xml commands
 			{
 				runShortcutsXmlCommand(id);
+				break;
+			}
+			if ((id >= ID_PLUGINS_CMD) && (id < ID_PLUGINS_CMD_LIMIT))
+			{
+				if (_pluginsManager)
+					_pluginsManager->runPluginCommand(id - ID_PLUGINS_CMD);
+				break;
+			}
+			if (_pluginsManager && _pluginsManager->inDynamicRange(id)) // in the dynamic range allocated with NPPM_ALLOCATECMDID
+			{
+				_pluginsManager->relayNppMessages(WM_COMMAND, id, 0);
 				break;
 			}
 			statusBar()->showMessage(tr("This command is not yet ported to NotePadLX."), 3000);

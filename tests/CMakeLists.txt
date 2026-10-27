@@ -148,3 +148,16 @@ target_compile_definitions(tst_localization PRIVATE NPLX_TEST_SOURCE_DATA_DIR="$
 target_link_libraries(tst_localization PRIVATE nplx_ui Qt6::Test)
 add_test(NAME localization COMMAND tst_localization)
 set_tests_properties(localization PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Phase 9: the plugin host, with the sample plugins (plugins/samples)
+if(NPLX_BUILD_SAMPLE_PLUGINS)
+    add_executable(tst_plugins tst_plugins.cpp)
+    set_target_properties(tst_plugins PROPERTIES AUTOMOC ON)
+    target_compile_definitions(tst_plugins PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT_SOURCE_DIR}/data"
+        NPLX_SAMPLE_PLUGINS_DIR="${CMAKE_BINARY_DIR}/sample-plugins")
+    target_include_directories(tst_plugins PRIVATE ${PROJECT_SOURCE_DIR}/plugins/samples/HelloWorld)
+    target_link_libraries(tst_plugins PRIVATE nplx_ui Qt6::Test)
+    add_dependencies(tst_plugins HelloWorld DockingSample)
+    add_test(NAME plugins COMMAND tst_plugins)
+    set_tests_properties(plugins PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()

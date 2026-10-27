@@ -16,6 +16,8 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
 endif()
 
 option(NPLX_BUILD_TESTS "Build NotePadLX tests" ON)
+# the sample plugins (plugins/samples), built into <build>/plugins/<Name>/<Name>.so; the tests load them
+option(NPLX_BUILD_SAMPLE_PLUGINS "Build the sample plugins" ON)
 # A development build also finds data/ in the source tree; packages use only <prefix>/share/notepadlx
 option(NPLX_USE_SOURCE_DATA_DIR "Fall back to the source tree's data/ directory" ON)
 
@@ -23,6 +25,7 @@ find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets Core5Compat DBus Netwo
 
 add_subdirectory(third_party)
 add_subdirectory(src)
+add_subdirectory(plugins)
 
 if(NPLX_BUILD_TESTS)
     enable_testing()

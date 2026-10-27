@@ -274,8 +274,25 @@ void Notepad_plus::playBackMacroStep(const recordedMacroStep& step, ScintillaEdi
 
 		// If text content has been modified in Scintilla,
 		// then notify Notepad++
-		// NPLX: upstream sends a WM_NOTIFY SCN_CHARADDED here; Notepad_plus ignores SCN_CHARADDED while playing back a
-		// macro, so only the plugins would see it. NPLX_TODO(Phase 9): relay it to the plugins.
+		// NPLX: Notepad_plus ignores SCN_CHARADDED while playing back a macro, so only the plugins see it
+		if ( (step._message == SCI_SETTEXT)
+			|| (step._message == SCI_REPLACESEL)
+			|| (step._message == SCI_ADDTEXT)
+			|| (step._message == SCI_ADDSTYLEDTEXT)
+			|| (step._message == SCI_INSERTTEXT)
+			|| (step._message == SCI_APPENDTEXT) )
+		{
+			SCNotification scnN{};
+			scnN.nmhdr.code = SCN_CHARADDED;
+			scnN.nmhdr.hwndFrom = static_cast<void*>(pEditView);
+			scnN.nmhdr.idFrom = 0;
+			if (step._sParameter.empty())
+				scnN.ch = 0;
+			else
+				scnN.ch = step._sParameter.at(0);
+
+			notifyPlugins(&scnN);
+		}
 	}
 }
 

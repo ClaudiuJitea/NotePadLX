@@ -763,11 +763,7 @@ void Notepad_plus::saveDockingParams()
 	// upstream saveGUIParams / _dockingManager: the internal panels and their container (config.xml)
 	NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
 	std::vector<PluginDlgDockingInfo> infos;
-	for (const PluginDlgDockingInfo& pddi : nppGUI._dockingData._pluginDockInfo)
-	{
-		if (pddi._name != NPP_INTERNAL_FUNCTION_STR) // plugin panels: kept as they are (Phase 9)
-			infos.push_back(pddi);
-	}
+	savePluginDockingParams(infos); // the plugin panels
 	for (DockingPanel* panel : _panels)
 	{
 		const int dockedCont = containerOf(dockWidgetArea(panel));
@@ -811,6 +807,7 @@ void Notepad_plus::loadDockingParams()
 		if (showPanel && isCommandPorted(pdi._internalID) && !isMenuItemChecked(pdi._internalID))
 			command(pdi._internalID);
 	}
+	loadPluginDockingParams(); // upstream: _pluginsManager.runPluginCommand(pdi._name, pdi._internalID)
 
 	// NPLX: the exact Qt layout of the panels just launched
 	QFile f(dockLayoutPath());

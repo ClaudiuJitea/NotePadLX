@@ -59,6 +59,7 @@
 #include "FunctionListPanel.h"
 #include "GoToLineDlg.h"
 #include "NplxStyle.h"
+#include "PluginsManager.h"
 #include "NppDarkModeOptions.h"
 #include "shortcut.h"
 #include "preferenceDlg.h"
@@ -140,6 +141,9 @@ bool Notepad_plus::isCommandPorted(int id)
 {
 	if (id >= IDM_LANG && id < IDM_LANG + 400)
 		return true;
+	// the plugin commands (upstream: ID_PLUGINS_CMD... and the range of NPPM_ALLOCATECMDID)
+	if ((id >= ID_PLUGINS_CMD && id <= ID_PLUGINS_CMD_LIMIT) || (id >= ID_PLUGINS_CMD_DYNAMIC && id <= ID_PLUGINS_CMD_DYNAMIC_LIMIT))
+		return true;
 	switch (id)
 	{
 #include "PortedCommands.inc"
@@ -163,6 +167,7 @@ Notepad_plus::Notepad_plus()
 Notepad_plus::~Notepad_plus()
 {
 	g_menuCommandNameResolver = nullptr;
+	detachPluginHost();
 	delete _smartHighlighter;
 }
 
@@ -470,10 +475,12 @@ void Notepad_plus::init()
 		connect(tab, &DocTabView::tabPinClicked, this, [this, tab](int index) {
 			tabPinned(tab, index);
 		});
-		connect(tab, &QTabBar::tabMoved, this, [this]() {
+		connect(tab, &QTabBar::tabMoved, this, [this](int, int to) {
 			// upstream TabBarPlus drag and drop: NPPM_INTERNAL_DOCORDERCHANGED
 			if (_pDocumentListPanel)
 				_pDocumentListPanel->updateTabOrder();
+			notifyPlugins(NPPN_DOCORDERCHANGED, reinterpret_cast<void*>(static_cast<intptr_t>(to)),
+				reinterpret_cast<uptr_t>(_pEditView->getCurrentBufferID()));
 		});
 	}
 
@@ -545,6 +552,10 @@ void Notepad_plus::init()
 
 	buildMainMenu();
 	changeMenuLang(); // the commands are translated as they are added, the menus here
+	initPlugins(); // upstream: the plugins are loaded before the menu section, their menu after the Run menu
+
+	// To notify plugins that toolbar icons can be registered
+	notifyPluginsFromNpp(NPPN_TBMODIFICATION, 0);
 	buildToolBar();
 	placeIncrementalSearchBar();
 	hideExcludedLanguages();
@@ -604,10 +615,12 @@ void Notepad_plus::init()
 	checkMacroState();
 
 	//Main menu is loaded, now load editor context menu items
-	nppParam.getContextMenuFromXmlTree(_mainMenuHandle.get(), nullptr); // NPLX_TODO(Phase 9): plugins menu
+	if (_pluginsManager && _pluginsManager->getMenuHandle())
+		_pluginsMenuHandle = std::make_unique<QtNppMenu>(_pluginsManager->getMenuHandle());
+	nppParam.getContextMenuFromXmlTree(_mainMenuHandle.get(), _pluginsMenuHandle.get());
 
 	//Main menu is loaded, now load tab context menu items
-	nppParam.getContextMenuFromXmlTree(_mainMenuHandle.get(), nullptr, false);
+	nppParam.getContextMenuFromXmlTree(_mainMenuHandle.get(), _pluginsMenuHandle.get(), false);
 
 	if (nppParam.hasCustomContextMenu())
 	{
@@ -818,7 +831,7 @@ bool Notepad_plus::reloadLang()
 
 	_nativeLangSpeaker.init(nativeLangDocRoot, true);
 
-	nppParam.reloadContextMenuFromXmlTree(_mainMenuHandle.get(), nullptr); // NPLX_TODO(Phase 9): plugins menu
+	nppParam.reloadContextMenuFromXmlTree(_mainMenuHandle.get(), _pluginsMenuHandle.get());
 
 	changeMenuLang();
 
@@ -1064,6 +1077,8 @@ void Notepad_plus::buildToolBar()
 		action->setIconVisibleInMenu(false); // upstream menus have no icons
 		_toolBar->addAction(action);
 	}
+
+	addPluginToolbarButtons(); // upstream registerDynBtn: the plugin buttons registered on NPPN_TBMODIFICATION
 
 	_toolBar->setVisible(NppParameters::getInstance().getNppGUI()._toolbarShow);
 }
@@ -1739,6 +1754,8 @@ void Notepad_plus::notifyBufferActivated(BufferID bufid, int view)
 		_pDocMap->setSyntaxHiliting();
 	}
 
+	notifyPluginsFromNpp(NPPN_BUFFERACTIVATED, reinterpret_cast<uptr_t>(bufid));
+
 	if (_pDocumentListPanel)
 	{
 		_pDocumentListPanel->activateItem(bufid, currentView());
@@ -1843,6 +1860,8 @@ void Notepad_plus::notifyBufferChanged(Buffer* buffer, int mask)
 
 			case DOC_DELETED: 	//ask for keep
 			{
+				notifyPluginsFromNpp(NPPN_FILEDELETED, reinterpret_cast<uptr_t>(buffer->getID()));
+
 				if (buffer->isInaccessible() && nppParam.isPlaceHolderEnabled())
 				{
 					buffer->setUnsync(true);
@@ -1872,6 +1891,14 @@ void Notepad_plus::notifyBufferChanged(Buffer* buffer, int mask)
 	if (mask & (BufferChangeReadonly))
 	{
 		checkDocState();
+
+		bool isSysReadOnly = buffer->getFileReadOnly();
+		bool isUserReadOnly = buffer->getUserReadOnly();
+		bool isDirty = buffer->isDirty();
+
+		// To notify plugins ro status is changed
+		notifyPlugins(NPPN_READONLYCHANGED, buffer->getID(),
+			(uptr_t)((isSysReadOnly || isUserReadOnly ? DOCSTATUS_READONLY : 0) | (isDirty ? DOCSTATUS_BUFFERDIRTY : 0)));
 	}
 
 	if (_pDocumentListPanel)
@@ -1906,7 +1933,7 @@ void Notepad_plus::notifyBufferChanged(Buffer* buffer, int mask)
 			_pFuncList->reload(); // sync FL with the current buffer lang
 		if (_pDocMap) // NPLX: upstream calls it after each language command
 			_pDocMap->setSyntaxHiliting();
-		// NPLX_TODO(Phase 9): NPPN_LANGCHANGED
+		notifyPluginsFromNpp(NPPN_LANGCHANGED, reinterpret_cast<uptr_t>(_pEditView->getCurrentBufferID()));
 	}
 
 	if (mask & (BufferChangeFormat | BufferChangeLanguage | BufferChangeUnicode))
@@ -2204,6 +2231,16 @@ void Notepad_plus::onScintillaNotify(Scintilla::NotificationData* scnData)
 
 	const bool isFromPrimary = (notifyView == _mainEditView);
 	const bool isFromSecondary = (notifyView == _subEditView);
+
+	// upstream WM_NOTIFY: the notification then goes to the plugins (_pluginsManager.notify). NPLX: hwndFrom is the
+	// view's handle of NppData (Qt Scintilla puts its own widget there)
+	struct PluginRelay
+	{
+		Notepad_plus* _npp;
+		SCNotification _scn;
+		~PluginRelay() { _npp->notifyPlugins(&_scn); }
+	} relay{ this, *notification };
+	relay._scn.nmhdr.hwndFrom = static_cast<void*>(notifyView);
 
 	switch (notification->nmhdr.code)
 	{
@@ -3120,6 +3157,8 @@ void Notepad_plus::closeEvent(QCloseEvent* event)
 	}
 
 	// upstream WM_CLOSE (NppBigSwitch.cpp)
+	notifyPluginsFromNpp(NPPN_BEFORESHUTDOWN, 0);
+
 	bool isSnapshotMode = nppgui.isSnapshotMode();
 	if (isSnapshotMode)
 	{
@@ -3150,6 +3189,7 @@ void Notepad_plus::closeEvent(QCloseEvent* event)
 	if (!allClosed && !nppParam.isEndSessionCritical())
 	{
 		// cancelled by user
+		notifyPluginsFromNpp(NPPN_CANCELSHUTDOWN, 0);
 		event->ignore();
 		return; // abort quitting
 	}
@@ -3158,6 +3198,8 @@ void Notepad_plus::closeEvent(QCloseEvent* event)
 	g_bNppExitFlag.store(true); // thread-safe op
 	if (_backupTimer)
 		_backupTimer->stop();
+
+	notifyPluginsFromNpp(NPPN_SHUTDOWN, 0);
 
 	// saveScintillasZoom + saveGUIParams (the parts ported so far)
 	NppGUI& nppGUI = nppParam.getNppGUI();

@@ -31,6 +31,7 @@
 #include <QProgressDialog>
 
 #include "Notepad_plus.h"
+#include "PluginsManager.h"
 
 #include "FindReplaceDlg.h"
 #include "RunDlg.h"
@@ -300,7 +301,7 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 					addHotSpot(_pEditView);
 				}
 			}
-			// NPLX_TODO(Phase 9): NPPN_GLOBALMODIFIED for plugins
+			notifyPlugins(NPPN_GLOBALMODIFIED, reinterpret_cast<void*>(wParam), 0);
 			return TRUE;
 		}
 
@@ -545,9 +546,15 @@ intptr_t Notepad_plus::nppMessage(unsigned int message, uptr_t wParam, sptr_t lP
 			intptr_t result = FALSE;
 			if (preferenceMessage(message, wParam, lParam, result))
 				return result;
-			break;
+			if (pluginApiMessage(message, wParam, lParam, result))
+				return result;
+			return FALSE; // upstream ::DefWindowProc
 		}
 	}
+
+	// upstream: the messages handled with a "break" go to the plugins too
+	if (_pluginsManager)
+		_pluginsManager->relayNppMessages(message, wParam, lParam);
 	return FALSE;
 }
 
@@ -1576,4 +1583,7 @@ void Notepad_plus::updateScintillas(bool doChangePanel)
 			}
 		}
 	}
+
+	// Notify plugins of update to styles xml
+	notifyPluginsFromNpp(NPPN_WORDSTYLESUPDATED, reinterpret_cast<uptr_t>(_pEditView->getCurrentBufferID()));
 }

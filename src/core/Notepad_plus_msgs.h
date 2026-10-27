@@ -319,12 +319,11 @@ enum Platform { PF_UNKNOWN, PF_X86, PF_X64, PF_IA64, PF_ARM64 };
 	// Return TRUE
 
 	#define NPPM_ADDTOOLBARICON_DEPRECATED (NPPMSG + 41)
-#ifdef _WIN32 // NPLX_TODO(Phase 9): the Linux plugin ABI passes icons differently
+		// NPLX: image files (UTF-8 paths: SVG, PNG...) in place of the HBITMAP / HICON handles
 		struct toolbarIcons {
-			HBITMAP	hToolbarBmp;
-			HICON	hToolbarIcon;
+			const char* hToolbarBmp;   // the icon (any size; SVG is drawn sharp at every toolbar size)
+			const char* hToolbarIcon;  // used when hToolbarBmp is nullptr
 		};
-#endif
 	// BOOL NPPM_ADDTOOLBARICON_DEPRECATED(UINT pluginCmdID, toolbarIcons* iconHandles) -- DEPRECATED: use NPPM_ADDTOOLBARICON_FORDARKMODE instead
 	// Add an icon to the toolbar.
 	// wParam[in]: pluginCmdID is the plugin command ID which corresponds to the menu item: funcItem[X]._cmdID
@@ -800,13 +799,12 @@ enum Platform { PF_UNKNOWN, PF_X86, PF_X64, PF_IA64, PF_ARM64 };
 	// Return current line number margin width mode (LINENUMWIDTH_DYNAMIC or LINENUMWIDTH_CONSTANT)
 
 	#define NPPM_ADDTOOLBARICON_FORDARKMODE (NPPMSG + 101)
-#ifdef _WIN32 // NPLX_TODO(Phase 9): the Linux plugin ABI passes icons differently
+	// NPLX: image files (UTF-8 paths: SVG, PNG...) in place of the HBITMAP / HICON handles
 	struct toolbarIconsWithDarkMode {
-		HBITMAP	hToolbarBmp;
-		HICON	hToolbarIcon;
-		HICON	hToolbarIconDarkMode;
+		const char* hToolbarBmp;           // the icon (any size; SVG is drawn sharp at every toolbar size)
+		const char* hToolbarIcon;          // used when hToolbarBmp is nullptr
+		const char* hToolbarIconDarkMode;  // in dark mode; nullptr: the light one
 	};
-#endif
 	// BOOL NPPM_ADDTOOLBARICON_FORDARKMODE(UINT pluginCmdID, toolbarIconsWithDarkMode* iconHandles)
 	// Use NPPM_ADDTOOLBARICON_FORDARKMODE instead obsolete NPPM_ADDTOOLBARICON (DEPRECATED) which doesn't support the dark mode
 	// wParam[in]: pluginCmdID
@@ -1290,3 +1288,51 @@ enum Platform { PF_UNKNOWN, PF_X86, PF_X64, PF_IA64, PF_ARM64 };
 	//scnNotification->nmhdr.idFrom = iconSetChoice;
 	// where iconSetChoice could be 1 of 5 possible values:
 	// 0 (Fluent UI: small), 1 (Fluent UI: large), 2 (Filled Fluent UI: small), 3 (Filled Fluent UI: large) and 4 (Standard icons: small).
+
+
+// NPLX: UTF-8 variants of the messages that pass wchar_t strings (wchar_t is UTF-32 on Linux; the wchar_t versions
+// still work). Each variant has the number of its wchar_t message + NPPM_UTF8_OFFSET.
+//
+// Getters "(size_t bufLen, char* buf)": copy the NUL-terminated UTF-8 string into buf and return its length in bytes
+// (without the NUL). With buf == nullptr nothing is copied and the required length is returned. 0 if bufLen is too
+// small (or the string is empty).
+// Getters "(id, char* buf)": as upstream, buf == nullptr returns the required length, otherwise buf must be large
+// enough. NPPM_GETFULLPATHFROMBUFFERID_UTF8 returns -1 if the buffer ID does not exist.
+// Setters: the strings in wParam / lParam are UTF-8; the return value is the one of the wchar_t message.
+#define NPPM_UTF8_OFFSET 0x8000
+	// getters (size_t bufLen, char* buf)
+	#define NPPM_GETFULLCURRENTPATH_UTF8   (NPPM_GETFULLCURRENTPATH + NPPM_UTF8_OFFSET)
+	#define NPPM_GETCURRENTDIRECTORY_UTF8  (NPPM_GETCURRENTDIRECTORY + NPPM_UTF8_OFFSET)
+	#define NPPM_GETFILENAME_UTF8          (NPPM_GETFILENAME + NPPM_UTF8_OFFSET)
+	#define NPPM_GETNAMEPART_UTF8          (NPPM_GETNAMEPART + NPPM_UTF8_OFFSET)
+	#define NPPM_GETEXTPART_UTF8           (NPPM_GETEXTPART + NPPM_UTF8_OFFSET)
+	#define NPPM_GETCURRENTWORD_UTF8       (NPPM_GETCURRENTWORD + NPPM_UTF8_OFFSET)
+	#define NPPM_GETCURRENTLINESTR_UTF8    (NPPM_GETCURRENTLINESTR + NPPM_UTF8_OFFSET)
+	#define NPPM_GETFILENAMEATCURSOR_UTF8  (NPPM_GETFILENAMEATCURSOR + NPPM_UTF8_OFFSET)
+	#define NPPM_GETNPPDIRECTORY_UTF8      (NPPM_GETNPPDIRECTORY + NPPM_UTF8_OFFSET)
+	#define NPPM_GETNPPFULLFILEPATH_UTF8   (NPPM_GETNPPFULLFILEPATH + NPPM_UTF8_OFFSET)
+	#define NPPM_GETPLUGINSCONFIGDIR_UTF8  (NPPM_GETPLUGINSCONFIGDIR + NPPM_UTF8_OFFSET)
+	#define NPPM_GETPLUGINHOMEPATH_UTF8    (NPPM_GETPLUGINHOMEPATH + NPPM_UTF8_OFFSET)
+	#define NPPM_GETNPPSETTINGSDIRPATH_UTF8 (NPPM_GETNPPSETTINGSDIRPATH + NPPM_UTF8_OFFSET)
+	#define NPPM_GETSETTINGSONCLOUDPATH_UTF8 (NPPM_GETSETTINGSONCLOUDPATH + NPPM_UTF8_OFFSET)
+	#define NPPM_GETCURRENTCMDLINE_UTF8    (NPPM_GETCURRENTCMDLINE + NPPM_UTF8_OFFSET)
+	// getters (id, char* buf)
+	#define NPPM_GETFULLPATHFROMBUFFERID_UTF8 (NPPM_GETFULLPATHFROMBUFFERID + NPPM_UTF8_OFFSET)
+	#define NPPM_GETLANGUAGENAME_UTF8      (NPPM_GETLANGUAGENAME + NPPM_UTF8_OFFSET)
+	#define NPPM_GETLANGUAGEDESC_UTF8      (NPPM_GETLANGUAGEDESC + NPPM_UTF8_OFFSET)
+	// setters (lParam: const char*)
+	#define NPPM_DOOPEN_UTF8               (NPPM_DOOPEN + NPPM_UTF8_OFFSET)
+	#define NPPM_SWITCHTOFILE_UTF8         (NPPM_SWITCHTOFILE + NPPM_UTF8_OFFSET)
+	#define NPPM_RELOADFILE_UTF8           (NPPM_RELOADFILE + NPPM_UTF8_OFFSET)
+	#define NPPM_SAVECURRENTFILEAS_UTF8    (NPPM_SAVECURRENTFILEAS + NPPM_UTF8_OFFSET)
+	#define NPPM_SAVEFILE_UTF8             (NPPM_SAVEFILE + NPPM_UTF8_OFFSET)
+	#define NPPM_LOADSESSION_UTF8          (NPPM_LOADSESSION + NPPM_UTF8_OFFSET)
+	#define NPPM_SETSTATUSBAR_UTF8         (NPPM_SETSTATUSBAR + NPPM_UTF8_OFFSET)
+	#define NPPM_SETUNTITLEDNAME_UTF8      (NPPM_SETUNTITLEDNAME + NPPM_UTF8_OFFSET)
+	#define NPPM_DMMVIEWOTHERTAB_UTF8      (NPPM_DMMVIEWOTHERTAB + NPPM_UTF8_OFFSET)
+	#define NPPM_CREATELEXER_UTF8          (NPPM_CREATELEXER + NPPM_UTF8_OFFSET)
+	// setters (wParam and lParam: const char*)
+	#define NPPM_LAUNCHFINDINFILESDLG_UTF8 (NPPM_LAUNCHFINDINFILESDLG + NPPM_UTF8_OFFSET)
+	#define NPPM_DMMGETPLUGINHWNDBYNAME_UTF8 (NPPM_DMMGETPLUGINHWNDBYNAME + NPPM_UTF8_OFFSET)
+	// setter (wParam: const char* destModuleName, lParam: CommunicationInfo* with the wchar_t srcModuleName)
+	#define NPPM_MSGTOPLUGIN_UTF8          (NPPM_MSGTOPLUGIN + NPPM_UTF8_OFFSET)
