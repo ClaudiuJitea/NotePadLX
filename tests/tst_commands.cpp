@@ -193,9 +193,13 @@ private slots:
 		QCOMPARE(_ui._count, boxes + 1);
 		QVERIFY(QString::fromStdWString(_ui._lastMessage).contains("2"));
 
-		// locale-aware sort (QCollator, digits as numbers)
+		// locale-aware sort (QCollator, digits as numbers); QCollator compares code points in the C locale (CI
+		// containers), so the test sets an English locale
+		const QLocale previousLocale;
+		QLocale::setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
 		newDocument("item10\nitem9\nÉcole\necole");
 		_npp->command(IDM_EDIT_SORTLINES_LOCALE_ASCENDING);
+		QLocale::setDefault(previousLocale);
 		const QStringList lines = text().split('\n', Qt::SkipEmptyParts);
 		QCOMPARE(lines.size(), 4);
 		QVERIFY(lines.indexOf("item9") < lines.indexOf("item10"));

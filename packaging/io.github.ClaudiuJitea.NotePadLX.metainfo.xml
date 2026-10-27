@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="1.0" date="2026-10-27">
+      <description>
+        <p>Plugins: a Linux plugin API that keeps the Notepad++ plugin interface (menu commands, notifications, NPPM messages, docked panels), with two sample plugins. Find in Finder searches inside the search results. The file associations are registered for the languages NotePadLX opens.</p>
+      </description>
+    </release>
     <release version="0.9" date="2026-10-26">
       <description>
         <p>The interface language switches without a restart, and the menus and all dialogs are translated. Files that need admin rights are saved through pkexec. Right button + wheel switches documents, session files open as sessions, the first line can name a new tab, and HTML / XML files open in the encoding they declare.</p>

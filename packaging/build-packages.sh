@@ -23,7 +23,7 @@ cmake -S "$ROOT" -B "$BUILD" -G Ninja \
     -DNPLX_BUILD_TESTS=OFF \
     -DNPLX_USE_SOURCE_DATA_DIR=OFF
 echo "==> Building"
-cmake --build "$BUILD"
+cmake --build "$BUILD" --parallel "${JOBS:-4}"  # limited: a full -j build runs out of memory
 
 VERSION="$(sed -n 's/^CMAKE_PROJECT_VERSION:STATIC=//p' "$BUILD/CMakeCache.txt")"
 

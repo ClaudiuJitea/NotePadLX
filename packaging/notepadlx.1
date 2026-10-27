@@ -1,4 +1,4 @@
-.TH NOTEPADLX 1 "2026-10-26" "NotePadLX 0.9" "User Commands"
+.TH NOTEPADLX 1 "2026-10-27" "NotePadLX 1.0" "User Commands"
 .SH NAME
 notepadlx \- source code editor, a Linux port of Notepad++
 .SH SYNOPSIS
@@ -31,6 +31,9 @@ Open the files read-only.
 .TP
 .B \-openFoldersAsWorkspace
 Open the given folders in the Folder as Workspace panel.
+.TP
+.B \-noPlugin
+Start without loading the plugins.
 .SH FILES
 .TP
 .I ~/.config/notepadlx/
@@ -38,9 +41,15 @@ The user settings: config.xml, shortcuts.xml, stylers.xml, session.xml and the t
 .TP
 .I /usr/share/notepadlx/
 The default settings, themes, languages and localization files.
+.TP
+.I ~/.local/share/notepadlx/plugins/<Name>/<Name>.so
+The user's plugins; the system plugins are in \fI/usr/lib/notepadlx/plugins/\fR.
 .SH ENVIRONMENT
 .TP
 .B NPLX_THEME
 \fBlight\fR or \fBdark\fR overrides the interface theme.
+.TP
+.B NPLX_PLUGIN_PATH
+More plugin folders, separated by colons.
 .SH SEE ALSO
 https://github.com/ClaudiuJitea/NotePadLX

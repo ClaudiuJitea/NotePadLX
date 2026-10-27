@@ -6,7 +6,8 @@
 
 **Notepad++, ported to Linux** — a native Qt 6 editor built from the Notepad++ sources.
 
-[![Version](https://img.shields.io/badge/version-0.9-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
+[![Version](https://img.shields.io/badge/version-1.0-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
+[![CI](https://github.com/ClaudiuJitea/NotePadLX/actions/workflows/ci.yml/badge.svg)](https://github.com/ClaudiuJitea/NotePadLX/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 [![Qt 6](https://img.shields.io/badge/Qt-6-41cd52?logo=qt&logoColor=white)](https://www.qt.io/)
 [![Platform: Linux](https://img.shields.io/badge/platform-Linux-fcc624?logo=linux&logoColor=black)](#install)
@@ -31,14 +32,15 @@ themes, user defined languages and macros work as they are.
 - **Panels:** Function List, Document Map, Document List, Folder as Workspace, Project Panels, Clipboard History
 - **Automation:** macros, the Run menu with `$(FULL_CURRENT_PATH)`-style variables, the Shortcut Mapper
 - **Tools:** Column Editor, MD5 / SHA-1 / SHA-256 / SHA-512, sessions, file monitoring, encodings, Wayland and X11
+- **Plugins:** the Notepad++ plugin interface as Linux `.so` plugins, recompiled from source ([docs/PLUGINS.md](docs/PLUGINS.md))
 
 ## Install
 
 Download from [Releases](https://github.com/ClaudiuJitea/NotePadLX/releases):
 
 ```sh
-chmod +x NotePadLX-0.9-x86_64.AppImage && ./NotePadLX-0.9-x86_64.AppImage   # any distro, glibc 2.43+
-sudo apt install ./notepadlx_0.9_amd64.deb                                   # Ubuntu 26.04 (Qt 6.10)
+chmod +x NotePadLX-1.0-x86_64.AppImage && ./NotePadLX-1.0-x86_64.AppImage   # any distro, glibc 2.43+
+sudo apt install ./notepadlx_1.0_amd64.deb                                   # Ubuntu 26.04 (Qt 6.10)
 ```
 
 On older distributions, build from source. Settings live in `~/.config/notepadlx/`; to bring your Notepad++
@@ -52,7 +54,7 @@ sudo apt install build-essential cmake ninja-build qt6-base-dev qt6-5compat-dev 
 
 cmake -S . -B build -G Ninja && cmake --build build
 build/src/notepadlx                       # run from the build tree
-cd build && ctest                         # 16 test suites, every Notepad++ default key
+cd build && ctest                         # 19 test suites, every Notepad++ default key
 packaging/build-packages.sh               # dist/: .deb and AppImage
 ```
 
@@ -60,12 +62,11 @@ All other dependencies (Scintilla, Lexilla, Boost.Regex, pugixml, json, uchardet
 
 ## Status
 
-**0.9** — phases 0–8 done (core, main window, files and sessions, search with incremental search, languages, panels,
-dialogs and tools with **Preferences**, printing, Move / Open in New Instance, Pin Tab, the tray icon, and the interface
-**translated, switched without a restart**). Files that need admin rights are saved through pkexec. Next: Find in
-Finder, a Linux plugin API (9), and Flatpak / CI (10). Unported commands are greyed out;
-Windows-only ones (PowerShell, registry, the WinGUp proxy) are removed. Details: [PORTING_STATUS.md](PORTING_STATUS.md),
-plan: [PROMPT.md](PROMPT.md).
+**1.0** — all phases of the port are done: core, main window, files and sessions, search (with Find in Finder),
+languages and themes, panels, dialogs and tools with **Preferences**, printing, the tray icon, the interface
+**translated, switched without a restart**, a **Linux plugin API**, and the AppImage and `.deb` packages, with
+CI building and testing every push on Ubuntu. Windows-only features (PowerShell, registry, the WinGUp
+updater) are removed. Details: [PORTING_STATUS.md](PORTING_STATUS.md), plan: [PROMPT.md](PROMPT.md).
 
 ## Contributing
 

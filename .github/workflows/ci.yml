@@ -1,0 +1,40 @@
+# NotePadLX CI: build and tests on Ubuntu 26.04 LTS (NotePadLX needs Qt >= 6.5).
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  QT_QPA_PLATFORM: offscreen
+  DEBIAN_FRONTEND: noninteractive
+
+jobs:
+  ubuntu:
+    name: Ubuntu 26.04 LTS
+    runs-on: ubuntu-latest
+    container: ubuntu:26.04
+    steps:
+      - name: Dependencies
+        run: >-
+          apt-get update -q && apt-get install -y -q --no-install-recommends
+          build-essential cmake ninja-build qt6-base-dev qt6-5compat-dev qt6-svg-plugins libgl-dev
+          poppler-utils fonts-dejavu-core shared-mime-info python3 desktop-file-utils appstream
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - name: Build
+        run: cmake --build build
+      - name: Tests
+        run: ctest --test-dir build --output-on-failure
+      - name: Desktop metadata
+        run: |
+          python3 tools/gen_mimetypes.py --check
+          desktop-file-validate packaging/notepadlx.desktop
+          appstreamcli validate --no-net packaging/io.github.ClaudiuJitea.NotePadLX.metainfo.xml
