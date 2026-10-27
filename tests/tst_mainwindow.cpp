@@ -296,7 +296,7 @@ private slots:
 		// Two files, a bookmark in the second, plus an unsaved untitled document (snapshot mode)
 		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
 		const bool wasSnapshotMode = nppGUI._isSnapshotMode;
-		nppGUI._isSnapshotMode = true; // NPLX default: off (data/config.model.xml)
+		nppGUI._isSnapshotMode = true; // the default (data/config.model.xml)
 		const QString a = _tmp.path() + "/a.txt";
 		const QString b = _tmp.path() + "/b.py";
 		writeFile(a, "alpha\n");
@@ -358,8 +358,10 @@ private slots:
 
 	void closeAsksToSaveUnsavedChanges()
 	{
-		// NotePadLX default (no session snapshot): quitting with an unsaved document asks to save it
-		QVERIFY(!NppParameters::getInstance().getNppGUI().isSnapshotMode());
+		// Session snapshot turned off in Preferences > Backup: quitting with an unsaved document asks to save it
+		NppGUI& nppGUI = NppParameters::getInstance().getNppGUI();
+		QVERIFY(nppGUI.isSnapshotMode()); // the default
+		nppGUI._isSnapshotMode = false;
 		_npp->command(IDM_FILE_NEW);
 		currentView()->execute(SCI_ADDTEXT, 6, reinterpret_cast<LPARAM>("draft\n"));
 		QVERIFY(currentView()->getCurrentBuffer()->isDirty());
@@ -374,6 +376,7 @@ private slots:
 		_ui._answerYesNo = IDNO;
 		_npp->command(IDM_FILE_CLOSE); // discard the draft
 		_ui._count = 0;
+		nppGUI._isSnapshotMode = true;
 	}
 
 	void commandLineParameters()

@@ -99,6 +99,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent* event) override;
 	void paintEvent(QPaintEvent* event) override;
 	void tabInserted(int index) override;
+	void tabRemoved(int index) override;
 
 private:
 	void loadIcons(bool alternate);

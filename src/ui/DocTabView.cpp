@@ -345,6 +345,15 @@ void DocTabView::tabInserted(int index)
 	QTabBar::tabInserted(index);
 	updateCloseButtons();
 	updatePinButtons();
+	// QTabBar only refreshes its size hint while visible: a tab bar emptied and refilled before the window shows
+	// (the "new 1" document replaced by a file from the command line) would keep the height of an empty bar
+	updateGeometry();
+}
+
+void DocTabView::tabRemoved(int index)
+{
+	QTabBar::tabRemoved(index);
+	updateGeometry();
 }
 
 void DocTabView::mousePressEvent(QMouseEvent* event)

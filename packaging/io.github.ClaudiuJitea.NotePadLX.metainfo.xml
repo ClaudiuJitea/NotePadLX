@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="1.0.1" date="2026-10-27">
+      <description>
+        <p>Session snapshot and periodic backup are on by default again: unsaved changes survive closing, a crash or a power loss, without asking to save on exit. The tab bar no longer disappears when a file is opened from the file manager.</p>
+      </description>
+    </release>
     <release version="1.0" date="2026-10-27">
       <description>
         <p>Plugins: a Linux plugin API that keeps the Notepad++ plugin interface (menu commands, notifications, NPPM messages, docked panels), with two sample plugins. Find in Finder searches inside the search results. The file associations are registered for the languages NotePadLX opens.</p>

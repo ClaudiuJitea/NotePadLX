@@ -308,7 +308,7 @@ private slots:
 		// NotePadLX default (data/config.model.xml): dark mode with themes/Solarized.xml
 		QVERIFY(nppParam.getNppGUI()._darkmode._isEnabled);
 		QVERIFY(QString::fromStdWString(nppParam.getNppGUI()._themeName).endsWith(QStringLiteral("themes/Solarized.xml")));
-		QVERIFY(!nppParam.getNppGUI().isSnapshotMode()); // closing with unsaved changes asks to save
+		QVERIFY(nppParam.getNppGUI().isSnapshotMode()); // unsaved changes are backed up, closing does not ask to save
 		LexerStyler* cpp = nppParam.getLStylerArray().getLexerStylerByName(L"cpp");
 		QVERIFY(cpp);
 		Style* instr = cpp->findByName(L"INSTRUCTION WORD");

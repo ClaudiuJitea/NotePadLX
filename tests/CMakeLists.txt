@@ -32,6 +32,15 @@ target_link_libraries(tst_mainwindow PRIVATE nplx_ui Qt6::Test)
 add_test(NAME mainwindow COMMAND tst_mainwindow)
 set_tests_properties(mainwindow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# Start-up: files from the command line opened before the window shows
+add_executable(tst_launch tst_launch.cpp)
+set_target_properties(tst_launch PROPERTIES AUTOMOC ON)
+target_compile_definitions(tst_launch PRIVATE NPLX_TEST_SOURCE_DATA_DIR="${PROJECT_SOURCE_DIR}/data")
+target_link_libraries(tst_launch PRIVATE nplx_ui Qt6::Test)
+
+add_test(NAME launch COMMAND tst_launch)
+set_tests_properties(launch PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # Phase 4: Find / Replace dialog, search engine, Finder, Find in Files
 add_executable(tst_findreplace tst_findreplace.cpp)
 set_target_properties(tst_findreplace PROPERTIES AUTOMOC ON)
