@@ -66,7 +66,7 @@ All other dependencies (Scintilla, Lexilla, Boost.Regex, pugixml, json, uchardet
 languages and themes, panels, dialogs and tools with **Preferences**, printing, the tray icon, the interface
 **translated, switched without a restart**, a **Linux plugin API**, and the AppImage and `.deb` packages, with
 CI building and testing every push on Ubuntu. Windows-only features (PowerShell, registry, the WinGUp
-updater) are removed. Details: [PORTING_STATUS.md](PORTING_STATUS.md), plan: [PROMPT.md](PROMPT.md).
+updater) are removed.
 
 ## Contributing
 

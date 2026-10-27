@@ -19,7 +19,7 @@
 // IDD_PREFERENCE_SUB_* resource (RcPreference.inc), and its run_dlgProc becomes initDialog() (WM_INITDIALOG),
 // onCommand() (WM_COMMAND) and onSliderChanged() (WM_HSCROLL). Messages to the main window go through the same
 // ParentMessenger as the Find dialog and are answered by Notepad_plus::nppMessage.
-// Not ported: the File Association page (Windows registry, PROMPT.md §6: .desktop MIME types instead).
+// Not ported: the File Association page (Windows registry: .desktop MIME types instead).
 
 #pragma once
 

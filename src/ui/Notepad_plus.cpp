@@ -94,8 +94,8 @@ namespace
 #include "MainMenuDef.inc"
 	};
 
-	// NPLX: the Windows-only commands that NotePadLX removes from the menu (no Linux equivalent, see PORTING_STATUS.md
-	// "Not ported"). Upstream also deletes the updater items at init when there is no updater.
+	// NPLX: the Windows-only commands that NotePadLX removes from the menu (no Linux equivalent).
+	// Upstream also deletes the updater items at init when there is no updater.
 	bool isRemovedOnLinuxImpl(int id)
 	{
 		switch (id)
