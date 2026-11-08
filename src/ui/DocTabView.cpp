@@ -112,18 +112,13 @@ void DocTabView::setFocusedTabBar(const DocTabView* tabBar)
 void DocTabView::applyColours()
 {
 	// upstream TabBarPlus::drawItem: the top bar colours in both modes; the text and inactive background colours only
-	// in light mode (dark mode uses its own). NPLX: a style sheet on the tab bar, over the application's tab rules
+	// in light mode (dark mode uses its own). NPLX: a style sheet on the tab bar, over the application's tab rules.
+	// The active tab's bar is always the NotePadLX accent (NplxStyle), whatever the colour theme: the theme's
+	// "Active tab focused / unfocused indicator" colours are not used, so that the bar looks the same in every theme
 	const int tabStatus = NppParameters::getInstance().getNppGUI()._tabStatus;
 	const bool isDarkMode = NppDarkMode::isEnabled();
-	const bool isFocused = (g_focusedTabBar == nullptr || g_focusedTabBar == this);
 	QString qss;
 
-	const std::optional<QColor>& top = g_tabColours[isFocused ? activeFocusedTop : activeUnfocusedTop];
-	if (top && (tabStatus & TAB_DRAWTOPBAR))
-	{
-		qss += QStringLiteral("QTabBar::tab:selected { border-bottom: 2px solid %1; }"
-			"QTabBar::tab:left:selected { border-bottom: none; border-right: 2px solid %1; }").arg(top->name());
-	}
 	if (!isDarkMode)
 	{
 		if (const auto& c = g_tabColours[activeText])

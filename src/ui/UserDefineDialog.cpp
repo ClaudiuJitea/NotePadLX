@@ -896,7 +896,8 @@ void UserDefineDialog::create()
 
 	const QRect importRect = dlgItem(IDC_IMPORT_BUTTON)->geometry();
 	const int padding = 6;
-	const int tabTop = importRect.bottom() + padding;
+	// NPLX: below the transparency slider too, which Qt draws taller than its .rc box
+	const int tabTop = std::max(importRect.bottom(), dlgItem(IDC_UD_PERCENTAGE_SLIDER)->geometry().bottom()) + padding;
 	_ctrlTab->move(padding, tabTop);
 	_ctrlTab->resize(width() - 2 * padding, _ctrlTab->sizeHint().height());
 	const int pageTop = tabTop + _ctrlTab->height();

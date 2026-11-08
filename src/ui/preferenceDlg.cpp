@@ -256,6 +256,25 @@ void PreferenceDlg::create()
 	_miscSubDlg = addPage<MiscSubDlg>(IDD_PREFERENCE_SUB_MISC_def, L"MISC.", L"MISC");
 
 	makeCategoryList();
+
+	// NPLX: Qt's list rows are taller than Win32's, so the .rc list does not show all the categories: it grows
+	// down to the Close button's bottom, and the dialog grows (with the Close button) by what is still missing
+	if (QListWidget* list = listBox(IDC_LIST_DLGTITLE); list && list->count() > 0)
+	{
+		list->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+		const int needed = list->sizeHintForRow(0) * list->count() + 2 * list->frameWidth() + 4;
+		QWidget* close = dlgItem(IDC_BUTTON_CLOSE);
+		const int bottom = close ? close->geometry().bottom() : list->geometry().bottom();
+		const int missing = std::max(0, list->y() + needed - 1 - bottom);
+		if (missing > 0)
+		{
+			setFixedHeight(height() + missing);
+			if (close)
+				close->move(close->x(), close->y() + missing);
+		}
+		list->resize(list->width(), bottom + missing - list->y() + 1);
+	}
+
 	showDialogByIndex(0);
 
 	// upstream IDM_SETTING_PREFERENCE: changePreferenceDlgLang on first use
@@ -1424,7 +1443,7 @@ void DarkModeSubDlg::initDialog()
 		auto* picker = new ColourPicker(this);
 		picker->disableRightClick();
 		const QRect label = dlgItem(labelID)->geometry();
-		picker->setGeometry(label.left() - 5 - 20, label.center().y() - 10, 20, 20);
+		picker->setGeometry(label.left() - 8 - 20, label.center().y() - 10, 20, 20);
 		connect(picker, &ColourPicker::colourPicked, this, [this, picker]() { colourPicked(picker); });
 		_colorPickers.emplace_back(picker, member);
 	}

@@ -155,7 +155,7 @@ private slots:
 
 	void tabBarColoursFromTheme()
 	{
-		// the theme's tab bar styles colour the tabs; the stylers.xml defaults keep the NotePadLX look
+		// the theme's tab bar styles do not change the tab bar in dark mode; the stylers.xml defaults keep the NotePadLX look
 		DocTabView* mainTab = _npp->getDocTab(MAIN_VIEW);
 		auto selectTheme = [this](const QString& name) {
 			const int index = themeCombo()->findText(name);
@@ -166,12 +166,11 @@ private slots:
 		selectTheme(QStringLiteral("Bespin")); // the default tab colours
 		QVERIFY(mainTab->styleSheet().isEmpty());
 
+		// NPLX: the active tab's bar is always the NotePadLX accent, whatever the theme's indicator colours
 		selectTheme(QStringLiteral("Navajo")); // "Active tab focused indicator" D92B10
-		QVERIFY2(mainTab->styleSheet().contains(QStringLiteral("#d92b10")), qPrintable(mainTab->styleSheet()));
-
-		// a colour picked in the Style Configurator shows at once (upstream TabBarPlus::setColour)
+		QVERIFY2(!mainTab->styleSheet().contains(QStringLiteral("#d92b10")), qPrintable(mainTab->styleSheet()));
 		DocTabView::setColour(RGB(0x12, 0x34, 0x56), DocTabView::activeFocusedTop);
-		QVERIFY(mainTab->styleSheet().contains(QStringLiteral("#123456")));
+		QVERIFY(!mainTab->styleSheet().contains(QStringLiteral("#123456")));
 
 		selectTheme(themeCombo()->itemText(0)); // Default (stylers.xml)
 		QVERIFY(mainTab->styleSheet().isEmpty());

@@ -6,7 +6,7 @@
 
 **Notepad++, ported to Linux** — a native Qt 6 editor built from the Notepad++ sources.
 
-[![Version](https://img.shields.io/badge/version-1.0-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
+[![Version](https://img.shields.io/badge/version-1.1-2563eb)](https://github.com/ClaudiuJitea/NotePadLX/releases)
 [![CI](https://github.com/ClaudiuJitea/NotePadLX/actions/workflows/ci.yml/badge.svg)](https://github.com/ClaudiuJitea/NotePadLX/actions/workflows/ci.yml)
 [![License: GPL v3](https://img.shields.io/badge/license-GPLv3-blue)](LICENSE)
 [![Qt 6](https://img.shields.io/badge/Qt-6-41cd52?logo=qt&logoColor=white)](https://www.qt.io/)
@@ -39,8 +39,8 @@ themes, user defined languages and macros work as they are.
 Download from [Releases](https://github.com/ClaudiuJitea/NotePadLX/releases):
 
 ```sh
-chmod +x NotePadLX-1.0-x86_64.AppImage && ./NotePadLX-1.0-x86_64.AppImage   # any distro, glibc 2.43+
-sudo apt install ./notepadlx_1.0_amd64.deb                                   # Ubuntu 26.04 (Qt 6.10)
+chmod +x NotePadLX-1.1-x86_64.AppImage && ./NotePadLX-1.1-x86_64.AppImage   # any distro, glibc 2.43+
+sudo apt install ./notepadlx_1.1_amd64.deb                                   # Ubuntu 26.04 (Qt 6.10)
 ```
 
 On older distributions, build from source. Settings live in `~/.config/notepadlx/`; to bring your Notepad++
@@ -62,7 +62,7 @@ All other dependencies (Scintilla, Lexilla, Boost.Regex, pugixml, json, uchardet
 
 ## Status
 
-**1.0** — all phases of the port are done: core, main window, files and sessions, search (with Find in Finder),
+**1.1** — all phases of the port are done: core, main window, files and sessions, search (with Find in Finder),
 languages and themes, panels, dialogs and tools with **Preferences**, printing, the tray icon, the interface
 **translated, switched without a restart**, a **Linux plugin API**, and the AppImage and `.deb` packages, with
 CI building and testing every push on Ubuntu. Windows-only features (PowerShell, registry, the WinGUp

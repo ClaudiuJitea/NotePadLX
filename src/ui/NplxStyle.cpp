@@ -503,7 +503,7 @@ QToolBar QToolButton { background: transparent; border: 1px solid transparent; b
 QToolBar QToolButton#qt_toolbar_ext_button { qproperty-icon: url({chevron_right_fg}); min-width: 18px; }
 QToolBar QToolButton:hover { background: {hover}; }
 QToolBar QToolButton:pressed { background: {pressed}; }
-QToolBar QToolButton:checked { background: {accentSoft}; border-color: {accentBorder}; }
+QToolBar QToolButton:checked { background: {raised}; border-color: {raisedBorder}; } /* NPLX: neutral, like the active tab */
 
 QMenuBar { background: {window}; padding: 3px 6px; spacing: 2px; }
 QMenuBar::item { padding: 5px 10px; border-radius: 6px; background: transparent; }
@@ -531,6 +531,8 @@ QPushButton:default { background: {accent}; color: {accentText}; border-color: {
 QPushButton:default:hover { background: {accentHover}; border-color: {accentHover}; }
 QPushButton:disabled { color: {disabled}; background: {window}; border-color: {borderSoft}; }
 QPushButton[compact="true"] { padding: 0px 2px; min-width: 0px; }
+QLineEdit[compact="true"] { padding: 2px 1px; }
+QCheckBox[groupTitle="true"], QRadioButton[groupTitle="true"] { background: {window}; padding: 0 3px; }
 QPushButton::menu-indicator { image: url({chevron_down}); width: 10px; subcontrol-position: right center; right: 6px; }
 
 QToolButton { border-radius: 5px; }
@@ -583,6 +585,10 @@ QRadioButton::indicator:checked:disabled { border-color: {disabled};
 
 QGroupBox { border: 1px solid {border}; border-radius: 8px; margin-top: 8px; padding-top: 4px; }
 QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 4px; color: {muted}; }
+QGroupBox::indicator { width: 15px; height: 15px; border: 1px solid {borderStrong}; border-radius: 4px; background: {base}; }
+QGroupBox::indicator:hover { border-color: {accent}; }
+QGroupBox::indicator:checked { background: {accent}; border-color: {accent}; image: url({check}); }
+QGroupBox::indicator:disabled { background: {window}; border-color: {borderSoft}; }
 
 QTabBar { background: transparent; }
 QTabBar::tab { background: transparent; color: {muted}; padding: 6px 12px; border: none; border-bottom: 2px solid transparent; }
@@ -595,6 +601,15 @@ QTabBar[nplxTopBar="false"]::tab:selected { border-bottom-color: transparent; }
 QTabBar::tab:left { border-bottom: none; border-right: 2px solid transparent; }
 QTabBar::tab:left:selected { border-right: 2px solid {accent}; }
 QTabBar[nplxTopBar="false"]::tab:left:selected { border-right-color: transparent; }
+/* NPLX: the document tabs are part of the window, not of the editor: the active one is a raised surface of the UI
+   theme (the same as a checked toolbar button) with the full text colour and a thicker bar, whose colour the colour
+   theme's "Active tab focused indicator" may set (DocTabView::applyColours) */
+DocTabView::tab { border-bottom: 3px solid transparent; border-top-left-radius: 6px; border-top-right-radius: 6px; }
+DocTabView::tab:selected { background: {raised}; color: {text}; border-bottom: 3px solid {accent}; }
+DocTabView::tab:left { border-bottom: none; border-right: 3px solid transparent; }
+DocTabView::tab:left:selected { border-bottom: none; border-right: 3px solid {accent}; }
+DocTabView[nplxTopBar="false"]::tab:selected { border-bottom-color: transparent; }
+DocTabView[nplxTopBar="false"]::tab:left:selected { border-right-color: transparent; }
 QTabBar::tab:disabled { color: {disabled}; }
 QTabBar::close-button { image: url({tab_close}); subcontrol-position: right; border-radius: 4px; margin: 2px; }
 QTabBar::close-button:hover { image: url({tab_close_hover}); background: {dangerSoft}; }
@@ -638,7 +653,16 @@ QDockWidget::close-button:hover, QDockWidget::float-button:hover { background: {
 QToolTip { background: {tooltip}; color: {tooltipText}; border: 1px solid {border}; border-radius: 5px; padding: 4px 7px; }
 )");
 
+	// NPLX: a raised surface (the active tab, a checked toolbar button): the window colour moved towards the text
+	// colour, so that it stands out by the same amount in every UI theme and tone, without a hue of its own
+	auto mix = [](const QColor& a, const QColor& b, qreal k) {
+		return QColor::fromRgbF(a.redF() + (b.redF() - a.redF()) * k, a.greenF() + (b.greenF() - a.greenF()) * k,
+			a.blueF() + (b.blueF() - a.blueF()) * k);
+	};
+	const QColor raised = mix(t._window, t._text, t._dark ? 0.13 : 0.08);
+	const QColor raisedBorder = mix(t._window, t._text, t._dark ? 0.24 : 0.20);
 	const std::pair<const char*, QColor> colours[] = {
+		{ "raisedBorder", raisedBorder }, { "raised", raised },
 		{ "window", t._window }, { "base", t._base }, { "alt", t._alt }, { "text", t._text }, { "muted", t._muted },
 		{ "borderSoft", t._borderSoft }, { "borderStrong", t._borderStrong }, { "border", t._border },
 		{ "hover", t._hover }, { "pressed", t._pressed }, { "button", t._button },

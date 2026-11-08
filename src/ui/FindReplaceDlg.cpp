@@ -2993,13 +2993,22 @@ std::wstring FindReplaceDlg::statusbarMessage() const
 
 bool FindReplaceDlg::isCheckedOrNot(int checkControlID) const
 {
-	auto* button = qobject_cast<QAbstractButton*>(ctrl(checkControlID));
+	QWidget* w = ctrl(checkControlID);
+	if (auto* group = qobject_cast<QGroupBox*>(w))
+		return group->isCheckable() && group->isChecked();
+	auto* button = qobject_cast<QAbstractButton*>(w);
 	return button && button->isChecked();
 }
 
 void FindReplaceDlg::setChecked(int checkControlID, bool checkOrNot) const
 {
-	if (auto* button = qobject_cast<QAbstractButton*>(ctrl(checkControlID)))
+	QWidget* w = ctrl(checkControlID);
+	if (auto* group = qobject_cast<QGroupBox*>(w); group && group->isCheckable())
+	{
+		QSignalBlocker blocker(group);
+		group->setChecked(checkOrNot);
+	}
+	else if (auto* button = qobject_cast<QAbstractButton*>(w))
 	{
 		QSignalBlocker blocker(button);
 		button->setChecked(checkOrNot);
@@ -3043,8 +3052,13 @@ void FindReplaceDlg::create()
 	_tab->addTab(QStringLiteral("Mark"));
 	mainLayout->addWidget(_tab);
 
-	auto* body = new QHBoxLayout;
-	body->setSpacing(10);
+	// the body is a grid: the fields and options on the left, the action buttons on the right, and the two group
+	// boxes (Search Mode, Transparency) side by side in a bottom row, so that their frames line up
+	auto* body = new QGridLayout;
+	body->setHorizontalSpacing(12);
+	body->setVerticalSpacing(8);
+	body->setColumnStretch(0, 1);
+	body->setRowStretch(0, 1);
 	mainLayout->addLayout(body, 1);
 
 	// NPLX: upstream IDD_FIND_REPLACE_DLG is one fixed-size dialog for all the tabs: every control has its place and
@@ -3060,8 +3074,8 @@ void FindReplaceDlg::create()
 
 	// --- left: fields, options and search mode
 	auto* left = new QVBoxLayout;
-	left->setSpacing(4);
-	body->addLayout(left, 1);
+	left->setSpacing(0);
+	body->addLayout(left, 0, 0);
 
 	// the rows have a fixed height and no spacing: a grid leaves out the spacing of a row whose controls are all
 	// hidden, even when they keep their place
@@ -3166,13 +3180,10 @@ void FindReplaceDlg::create()
 
 	fields->addWidget(makeCheck(IDC_MARKLINE_CHECK, QStringLiteral("Book&mark line")), 2, 0, 1, 3, Qt::AlignVCenter);
 	fields->addWidget(makeCheck(IDC_PURGE_CHECK, QStringLiteral("Purge for each search")), 3, 0, 1, 3, Qt::AlignVCenter);
-	for (int row = 0; row <= 3; ++row)
-		fields->setRowMinimumHeight(row, findWhat->sizeHint().height() + 4);
 
 	// the search options (Backward direction and Wrap around are hidden in Find in Files: they keep their place)
 	auto* checks = new QVBoxLayout;
 	checks->setSpacing(2);
-	checks->setContentsMargins(0, 6, 0, 0);
 	left->addLayout(checks);
 	checks->addWidget(keepPlace(makeCheck(IDC_BACKWARDDIRECTION, QStringLiteral("Backward direction"))));
 	checks->addWidget(makeCheck(IDWHOLEWORD, QStringLiteral("Match &whole word only")));
@@ -3198,13 +3209,13 @@ void FindReplaceDlg::create()
 	regexRow->addWidget(makeCheck(IDREDOTMATCHNL, QStringLiteral("&. matches newline")));
 	regexRow->addStretch(1);
 	modeLayout->addLayout(regexRow);
-	left->addWidget(modeGroup);
+	body->addWidget(modeGroup, 1, 0);
 
 	// --- right: action buttons (upstream: one column at x=298, the side check boxes at x=393), Close and
 	// Transparency at the bottom
 	auto* right = new QVBoxLayout;
 	right->setSpacing(4);
-	body->addLayout(right);
+	body->addLayout(right, 0, 1);
 
 	auto* actions = new QGridLayout;
 	actions->setHorizontalSpacing(4);
@@ -3269,11 +3280,16 @@ void FindReplaceDlg::create()
 	// row 5: Project Panel 3
 	actions->addWidget(makeCheck(IDD_FINDINFILES_PROJECT3_CHECK, QStringLiteral("Project Panel 3")), 5, 0, 1, 2);
 
-	// the rows keep their height when a tab leaves them empty, and the buttons their width
-	const int rowHeight = std::max({ findNextOk->sizeHint().height(), twoButtons->sizeHint().height(),
-		replaceAndStop->sizeHint().height(), confirmReplace->sizeHint().height() });
+	// the rows keep their height when a tab leaves them empty, and the buttons their width. The fields on the left
+	// and the buttons on the right share one row height, so that each field lines up with the button beside it, and
+	// the first search option with the fifth row of buttons
+	const int rowHeight = std::max({ findWhat->sizeHint().height(), findNextOk->sizeHint().height(),
+		twoButtons->sizeHint().height(), replaceAndStop->sizeHint().height(), confirmReplace->sizeHint().height() }) + 4;
 	for (int row = 0; row <= 5; ++row)
-		actions->setRowMinimumHeight(row, rowHeight + 4);
+		actions->setRowMinimumHeight(row, rowHeight);
+	for (int row = 0; row <= 3; ++row)
+		fields->setRowMinimumHeight(row, rowHeight);
+	checks->setContentsMargins(0, std::max(0, (rowHeight - ctrl(IDC_BACKWARDDIRECTION)->sizeHint().height()) / 2), 0, 0);
 	int buttonWidth = 0;
 	const QList<QPushButton*> actionButtons = { findNextOk, fifFind, countAll, replace, replaceInFiles, replaceInProjects,
 		markAll, findAllCurrent, replaceAll, clearAll, findAllOpened, replaceOpened, copyMarked };
@@ -3291,18 +3307,23 @@ void FindReplaceDlg::create()
 	closeRow->addSpacing(actions->horizontalSpacing() + twoButtons->sizeHint().width());
 	right->addLayout(closeRow);
 
-	// Transparency (upstream IDC_TRANSPARENT_*)
-	auto* transparentGroup = new QGroupBox(this);
+	// Transparency (upstream IDC_TRANSPARENT_*): upstream puts the check box in the frame of the group box, as the
+	// title of a checkable group box does. One widget is both IDC_TRANSPARENT_GRPBOX and IDC_TRANSPARENT_CHECK
+	auto* transparentGroup = new QGroupBox(QStringLiteral("Transparenc&y"), this);
+	transparentGroup->setCheckable(true);
+	transparentGroup->setChecked(false);
 	_ctrls[IDC_TRANSPARENT_GRPBOX] = transparentGroup;
+	_ctrls[IDC_TRANSPARENT_CHECK] = transparentGroup;
+	connect(transparentGroup, &QGroupBox::toggled, this, [this]() { command(IDC_TRANSPARENT_CHECK); });
 	auto* transparentLayout = new QGridLayout(transparentGroup);
-	transparentLayout->addWidget(makeCheck(IDC_TRANSPARENT_CHECK, QStringLiteral("Transparenc&y")), 0, 0, 1, 2);
+	transparentLayout->setVerticalSpacing(2);
 	auto* transparentButtons = new QButtonGroup(this);
 	QRadioButton* lossFocus = makeRadio(IDC_TRANSPARENT_LOSSFOCUS_RADIO, QStringLiteral("On losing focus"));
 	QRadioButton* always = makeRadio(IDC_TRANSPARENT_ALWAYS_RADIO, QStringLiteral("Always"));
 	transparentButtons->addButton(lossFocus);
 	transparentButtons->addButton(always);
-	transparentLayout->addWidget(lossFocus, 1, 0);
-	transparentLayout->addWidget(always, 2, 0);
+	transparentLayout->addWidget(lossFocus, 0, 0);
+	transparentLayout->addWidget(always, 1, 0);
 	auto* slider = new QSlider(Qt::Horizontal, this);
 	slider->setRange(20, 200);
 	slider->setMinimumWidth(90);
@@ -3314,11 +3335,17 @@ void FindReplaceDlg::create()
 		if (isCheckedOrNot(IDC_TRANSPARENT_ALWAYS_RADIO))
 			setWindowOpacity(1.0 - value / 255.0);
 	});
-	transparentLayout->addWidget(slider, 1, 1, 2, 1);
-	right->addWidget(transparentGroup);
+	slider->setToolTip(QStringLiteral("Transparency level"));
+	transparentLayout->addWidget(slider, 0, 1, 2, 1);
+	transparentLayout->setColumnStretch(1, 1);
+	transparentLayout->setRowStretch(2, 1);
+	body->addWidget(transparentGroup, 1, 1);
 
+	// the status line: no frame while it is empty, so that it does not look like an unused field; it keeps its
+	// height, so that the dialog does not grow with the first message
 	_statusBar = new QLabel(this);
-	_statusBar->setFrameShape(QFrame::StyledPanel);
+	_statusBar->setFrameShape(QFrame::NoFrame);
+	_statusBar->setContentsMargins(2, 0, 2, 0);
 	_statusBar->setMinimumHeight(_statusBar->fontMetrics().height() + 6);
 	_statusBar->setTextInteractionFlags(Qt::TextSelectableByMouse);
 	mainLayout->addWidget(_statusBar);

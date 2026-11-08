@@ -22,11 +22,13 @@
 #pragma once
 
 #include <map>
+#include <vector>
 #include <string>
 
 #include <QDialog>
 
 class QComboBox;
+class QGroupBox;
 class QListWidget;
 class QSlider;
 
@@ -108,6 +110,8 @@ protected:
 	bool _isUpdatingControls = false; // set while code changes the controls, to mute their notifications
 
 private:
+	void polishGeometry(const std::vector<QWidget*>& controls, const std::vector<QGroupBox*>& groups);
+
 	std::map<int, QWidget*> _ctrls;
 	qreal _baseUnitX = 6; // NPLX: fractional, the integer division made the dialogs too small for their text
 	qreal _baseUnitY = 13;

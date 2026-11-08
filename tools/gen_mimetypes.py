@@ -12,11 +12,18 @@
 # the types that derive from text/plain, such as application/json), so that a shared extension like ".ts" (MPEG
 # transport stream vs TypeScript) does not make NotePadLX the handler of video files.
 #
+# Only the freedesktop.org database itself is read (packages/freedesktop.org.xml, compiled into a temporary directory
+# with update-mime-database), not the types other installed applications add to /usr/share/mime: the result is then
+# the same on every machine with the same shared-mime-info, which the CI check relies on.
+#
 # Usage: tools/gen_mimetypes.py [--check] [<shared-mime-info dir, default /usr/share/mime>]
 #   --check: do not write, exit 1 if the .desktop file is not up to date (CI)
 
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -95,7 +102,12 @@ def main():
     args = [a for a in sys.argv[1:] if a != '--check']
     check = '--check' in sys.argv[1:]
     mime_dir = Path(args[0]) if args else Path('/usr/share/mime')
-    line = 'MimeType=' + ''.join(t + ';' for t in mime_types(mime_dir))
+    with tempfile.TemporaryDirectory() as tmp:
+        clean = Path(tmp)
+        (clean / 'packages').mkdir()
+        shutil.copy(mime_dir / 'packages' / 'freedesktop.org.xml', clean / 'packages')
+        subprocess.run(['update-mime-database', str(clean)], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        line = 'MimeType=' + ''.join(t + ';' for t in mime_types(clean))
 
     desktop = DESKTOP.read_text(encoding='utf-8')
     updated = re.sub(r'^MimeType=.*$', line, desktop, flags=re.M) if re.search(r'^MimeType=', desktop, re.M) \

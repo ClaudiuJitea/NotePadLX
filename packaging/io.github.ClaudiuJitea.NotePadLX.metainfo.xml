@@ -36,6 +36,11 @@
     <binary>notepadlx</binary>
   </provides>
   <releases>
+    <release version="1.1" date="2026-11-08">
+      <description>
+        <p>Dialogs polished: Find, Preferences, User Defined Language and the other dialogs have their labels, fields and group boxes aligned, and no text is cut. The active document tab and the pressed toolbar buttons stand out clearly in every theme, and the active tab's line keeps one colour whatever the colour theme.</p>
+      </description>
+    </release>
     <release version="1.0.1" date="2026-10-27">
       <description>
         <p>Session snapshot and periodic backup are on by default again: unsaved changes survive closing, a crash or a power loss, without asking to save on exit. The tab bar no longer disappears when a file is opened from the file manager.</p>

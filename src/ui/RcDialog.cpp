@@ -29,6 +29,8 @@
 #include <QRegularExpressionValidator>
 #include <QSlider>
 #include <QSpinBox>
+#include <QStyle>
+#include <QStyleOptionGroupBox>
 #include <QTabBar>
 #include <QTreeWidget>
 
@@ -82,6 +84,7 @@ void RcDialog::buildFrom(const RcDialogDef& def)
 	QButtonGroup* radioGroup = nullptr;
 	QLabel* pendingBuddy = nullptr;
 	std::vector<QGroupBox*> groups;
+	std::vector<QWidget*> controls;
 
 	for (int i = 0; i < def._count; ++i)
 	{
@@ -269,6 +272,7 @@ void RcDialog::buildFrom(const RcDialogDef& def)
 		}
 
 		w->setGeometry(r);
+		controls.push_back(w);
 		if (c._style & RcHidden)
 			w->hide();
 		if (c._style & RcDisabled)
@@ -277,11 +281,142 @@ void RcDialog::buildFrom(const RcDialogDef& def)
 			_ctrls[id] = w;
 	}
 
+	polishGeometry(controls, groups);
+
 	// group boxes behind the controls they frame
 	for (QGroupBox* g : groups)
 		g->lower();
 
 	_isCreated = true;
+}
+
+// NPLX: the .rc coordinates were made for Win32 controls and fonts. Qt's controls are taller and its text is wider,
+// so a few things that line up on Windows do not here. This pass fixes them, without moving anything far:
+// - a label, check box or radio button beside a one-line field (edit, combo box, spin box, button) is centred on
+//   that field, so that the row reads as one line;
+// - a label whose text runs into the field beside it gets a small gap;
+// - a check box or radio button placed on the top edge of a group box without a title (upstream: a check box as
+//   the title of the group) sits on the frame line, over a background that hides the line behind its text;
+// - a check box or radio button whose text is wider than its .rc box grows up to the dialog edge, so that the
+//   text is not cut;
+// - a narrow edit gets less inner padding, so that its digits are not cut.
+void RcDialog::polishGeometry(const std::vector<QWidget*>& controls, const std::vector<QGroupBox*>& groups)
+{
+	const int oneLine = qRound(2.2 * _baseUnitY);
+	auto isField = [oneLine](const QWidget* w) {
+		return (qobject_cast<const QLineEdit*>(w) || qobject_cast<const QComboBox*>(w) || qobject_cast<const QSpinBox*>(w)
+			|| qobject_cast<const QPushButton*>(w)) && w->height() <= oneLine;
+	};
+	auto isCheckOrRadio = [](const QWidget* w) {
+		return qobject_cast<const QCheckBox*>(w) || qobject_cast<const QRadioButton*>(w);
+	};
+	auto isOneLineLabel = [](const QWidget* w) {
+		auto* l = qobject_cast<const QLabel*>(w);
+		return l && !l->wordWrap() && !l->text().isEmpty() && l->frameShape() == QFrame::NoFrame;
+	};
+	const int nearGap = qRound(3 * _baseUnitX);
+
+	// the group box titles first, so that the row alignment below sees them in place
+	std::vector<QWidget*> titles;
+	for (QGroupBox* g : groups)
+	{
+		if (!g->title().isEmpty())
+			continue;
+		QStyleOptionGroupBox opt;
+		opt.initFrom(g);
+		opt.subControls = QStyle::SC_GroupBoxFrame;
+		opt.lineWidth = 1;
+		const int frameTop = g->y() + g->style()->subControlRect(QStyle::CC_GroupBox, &opt, QStyle::SC_GroupBoxFrame, g).top();
+		for (QWidget* w : controls)
+		{
+			if (!isCheckOrRadio(w))
+				continue;
+			const QRect r = w->geometry();
+			if (std::abs(r.center().y() - g->y()) > r.height() || r.left() < g->x() - 2 || r.left() > g->x() + qRound(16 * _baseUnitX))
+				continue;
+			const int width = std::min(w->sizeHint().width() + 4, g->x() + g->width() - r.left() - 8);
+			w->setGeometry(std::max(r.left(), g->x() + 8), frameTop - r.height() / 2, width, r.height());
+			w->setProperty("groupTitle", true);
+			titles.push_back(w);
+		}
+	}
+	auto isTitle = [&titles](const QWidget* w) { return std::find(titles.begin(), titles.end(), w) != titles.end(); };
+
+	for (QWidget* w : controls)
+	{
+		const bool label = isOneLineLabel(w);
+		if ((!label && !isCheckOrRadio(w)) || isTitle(w))
+			continue;
+		QRect r = w->geometry();
+
+		// the nearest one-line field on the same row
+		QWidget* field = nullptr;
+		int bestGap = nearGap + 1;
+		bool fieldOnRight = true;
+		for (QWidget* f : controls)
+		{
+			if (f == w || !isField(f) || f->parentWidget() != w->parentWidget())
+				continue;
+			const QRect fr = f->geometry();
+			if (std::abs(fr.center().y() - r.center().y()) > std::max(fr.height(), r.height()) / 2)
+				continue;
+			const bool onRight = fr.center().x() > r.center().x();
+			const int gap = onRight ? fr.left() - r.right() - 1 : r.left() - fr.right() - 1;
+			if (gap < -r.width() / 2 || gap >= bestGap)
+				continue;
+			field = f;
+			bestGap = gap;
+			fieldOnRight = onRight;
+		}
+		if (!field)
+			continue;
+		const QRect fr = field->geometry();
+		r.moveTop(fr.center().y() - r.height() / 2);
+		if (auto* l = qobject_cast<QLabel*>(w))
+		{
+			l->setAlignment((l->alignment() & Qt::AlignHorizontal_Mask) | Qt::AlignVCenter);
+			// a gap between the text and the field when the text reaches it
+			const int textWidth = l->fontMetrics().horizontalAdvance(l->text().remove(QLatin1Char('&')));
+			const Qt::Alignment h = QStyle::visualAlignment(layoutDirection(), l->alignment()) & Qt::AlignHorizontal_Mask;
+			const bool textOnFieldSide = fieldOnRight ? (h & Qt::AlignRight) : (h & Qt::AlignLeft);
+			if (bestGap < 4 && (textOnFieldSide || textWidth + 4 > r.width()))
+			{
+				const int extra = 4 - std::max(0, bestGap) + std::max(0, -bestGap);
+				if (fieldOnRight)
+				{
+					r.adjust(-extra, 0, 0, 0);
+					l->setContentsMargins(0, 0, extra, 0);
+				}
+				else
+				{
+					r.adjust(0, 0, extra, 0);
+					l->setContentsMargins(extra, 0, 0, 0);
+				}
+			}
+		}
+		w->setGeometry(r);
+	}
+
+	for (QWidget* w : controls)
+	{
+		if (isCheckOrRadio(w) && !isTitle(w))
+		{
+			const QRect r = w->geometry();
+			const int wanted = w->sizeHint().width();
+			if (wanted <= r.width())
+				continue;
+			// up to the edge of the dialog, or of the group box around it
+			int right = width() - _padding;
+			for (QGroupBox* g : groups)
+				if (g->geometry().contains(r.topLeft()) && g->geometry().contains(r.bottomLeft()))
+					right = std::min(right, g->geometry().right() - 6);
+			w->resize(std::min(wanted, std::max(r.width(), right - r.left())), r.height());
+			if (w->width() < wanted && w->toolTip().isEmpty())
+				w->setToolTip(qobject_cast<QAbstractButton*>(w)->text().remove(QLatin1Char('&')));
+		}
+		else if (auto* edit = qobject_cast<QLineEdit*>(w); edit && edit->width() < edit->fontMetrics().horizontalAdvance(QStringLiteral("0000")) + 14)
+			edit->setProperty("compact", true);
+	}
 }
 
 QWidget* RcDialog::dlgItem(int id) const
